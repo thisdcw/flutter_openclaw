@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_dependencies.dart';
 import 'app_theme.dart';
-import '../presentation/screens/settings_screen.dart';
+import '../presentation/screens/chat_screen.dart';
 
 class OpenClawApp extends StatelessWidget {
   const OpenClawApp({
@@ -18,7 +18,7 @@ class OpenClawApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'OpenClaw',
       theme: buildAppTheme(),
-      home: SettingsScreen(
+      home: ChatScreen(
         settingsController: dependencies.settingsController,
         connectionController: dependencies.connectionController,
         chatController: dependencies.chatController,

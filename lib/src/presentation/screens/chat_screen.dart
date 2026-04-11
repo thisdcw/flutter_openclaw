@@ -2,20 +2,24 @@ import 'package:flutter/material.dart';
 
 import '../../application/controllers/chat_controller.dart';
 import '../../application/controllers/connection_controller.dart';
+import '../../application/controllers/settings_controller.dart';
 import '../../infrastructure/util/openclaw_logger.dart';
 import '../widgets/chat_composer.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/status_badge.dart';
+import 'settings_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
     super.key,
     required this.chatController,
     required this.connectionController,
+    this.settingsController,
   });
 
   final ChatController chatController;
   final ConnectionController connectionController;
+  final SettingsController? settingsController;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -62,6 +66,14 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             actions: [
               StatusBadge(label: widget.connectionController.phase),
+              const SizedBox(width: 10),
+              IconButton(
+                onPressed: widget.settingsController == null
+                    ? null
+                    : _openSettings,
+                icon: const Icon(Icons.settings_rounded),
+                tooltip: 'Open Settings',
+              ),
               const SizedBox(width: 16),
             ],
           ),
@@ -79,6 +91,18 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (blockedReason.isNotEmpty) ...[
+                      _SetupPromptCard(
+                        title: 'OpenClaw is not ready yet',
+                        description:
+                            'Your assistant needs connection or permission setup before it can send messages.',
+                        buttonLabel: 'Open Settings',
+                        onPressed: widget.settingsController == null
+                            ? null
+                            : _openSettings,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     if (blockedReason.isNotEmpty) ...[
                       _ChatBanner(
                         message: blockedReason,
@@ -143,6 +167,22 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         );
       },
+    );
+  }
+
+  void _openSettings() {
+    final settingsController = widget.settingsController;
+    if (settingsController == null) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => SettingsScreen(
+          settingsController: settingsController,
+          connectionController: widget.connectionController,
+          chatController: widget.chatController,
+        ),
+      ),
     );
   }
 }
@@ -213,6 +253,67 @@ class _ChatEmptyState extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SetupPromptCard extends StatelessWidget {
+  const _SetupPromptCard({
+    required this.title,
+    required this.description,
+    required this.buttonLabel,
+    this.onPressed,
+  });
+
+  final String title;
+  final String description;
+  final String buttonLabel;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF2FF),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF2F6BFF),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.tips_and_updates_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(title, style: theme.textTheme.titleMedium),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(description, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: onPressed,
+            icon: const Icon(Icons.settings_rounded),
+            label: Text(buttonLabel),
+          ),
+        ],
       ),
     );
   }

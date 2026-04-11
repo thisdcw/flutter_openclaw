@@ -5,7 +5,6 @@ import '../../application/controllers/connection_controller.dart';
 import '../../application/controllers/settings_controller.dart';
 import '../../domain/models/gateway_config.dart';
 import '../../infrastructure/util/openclaw_logger.dart';
-import 'chat_screen.dart';
 import '../widgets/connection_summary_card.dart';
 import '../widgets/settings_form.dart';
 
@@ -72,12 +71,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
             children: [
-              _HeroCard(
-                title: 'OpenClaw Assistant',
-                subtitle:
-                    'Connect your gateway and start chatting with OpenClaw.',
-                phase: connectionController.phase,
-                sessionId: sessionIdController.text,
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Settings', style: theme.textTheme.headlineMedium),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Manage your connection and gateway configuration.',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      Navigator.of(context).maybePop();
+                    },
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Close Settings',
+                  ),
+                ],
               ),
               const SizedBox(height: 18),
               ConnectionSummaryCard(
@@ -120,12 +136,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                onPressed: _openChat,
-                icon: const Icon(Icons.auto_awesome_rounded),
-                label: const Text('Open Chat'),
               ),
             ],
           ),
@@ -180,105 +190,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     widget.connectionController.reset();
   }
 
-  void _openChat() {
-    openClawLog(
-      'SettingsScreen',
-      'open chat tapped',
-      fields: <String, Object?>{
-        'phase': widget.connectionController.phase,
-        'canSend': widget.connectionController.canSend,
-      },
-    );
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => ChatScreen(
-          chatController: widget.chatController,
-          connectionController: widget.connectionController,
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroCard extends StatelessWidget {
-  const _HeroCard({
-    required this.title,
-    required this.subtitle,
-    required this.phase,
-    required this.sessionId,
-  });
-
-  final String title;
-  final String subtitle;
-  final String phase;
-  final String sessionId;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.78),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: theme.colorScheme.outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 10),
-          Text(
-            subtitle,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.textTheme.bodySmall?.color,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _HeroStat(label: 'Phase', value: phase),
-              _HeroStat(label: 'Session', value: sessionId),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroStat extends StatelessWidget {
-  const _HeroStat({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFF5FF),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: theme.colorScheme.outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label, style: theme.textTheme.labelMedium),
-          const SizedBox(height: 4),
-          Text(value, style: theme.textTheme.titleMedium),
-        ],
-      ),
-    );
-  }
 }
 
 class _InlineBanner extends StatelessWidget {
