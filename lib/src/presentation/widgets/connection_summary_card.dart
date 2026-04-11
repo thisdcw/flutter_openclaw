@@ -14,28 +14,72 @@ class ConnectionSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelStyle = Theme.of(context).textTheme.labelMedium;
-    final valueStyle = Theme.of(context).textTheme.bodyMedium;
+    final theme = Theme.of(context);
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Connection Summary', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Text('Phase', style: labelStyle),
-            Text(phase, style: valueStyle),
-            const SizedBox(height: 8),
-            Text('Device ID', style: labelStyle),
-            Text(deviceId, style: valueStyle),
-            const SizedBox(height: 8),
-            Text('Granted Scopes', style: labelStyle),
+            Text('Connection Overview', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 6),
             Text(
-              scopes.isEmpty ? '(none)' : scopes.join(', '),
-              style: valueStyle,
+              'Live connection state for this device and session.',
+              style: theme.textTheme.bodySmall,
             ),
+            const SizedBox(height: 18),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                _SummaryTile(label: 'Phase', value: phase),
+                _SummaryTile(label: 'Device ID', value: deviceId),
+                _SummaryTile(
+                  label: 'Granted Scopes',
+                  value: scopes.isEmpty ? '(none)' : scopes.join(', '),
+                  isWide: true,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryTile extends StatelessWidget {
+  const _SummaryTile({
+    required this.label,
+    required this.value,
+    this.isWide = false,
+  });
+
+  final String label;
+  final String value;
+  final bool isWide;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        minWidth: isWide ? 280 : 150,
+        maxWidth: isWide ? 420 : 220,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF4F8FF),
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: theme.textTheme.labelMedium),
+            const SizedBox(height: 6),
+            Text(value, style: theme.textTheme.bodyMedium),
           ],
         ),
       ),

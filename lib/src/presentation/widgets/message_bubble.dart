@@ -14,49 +14,64 @@ class MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isUser = message.role == MessageRole.user;
     final isError = message.role == MessageRole.error;
-    final alignment =
-        isUser ? Alignment.centerRight : Alignment.centerLeft;
+    final alignment = isUser ? Alignment.centerRight : Alignment.centerLeft;
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final backgroundColor = isError
-        ? colorScheme.errorContainer
+        ? theme.colorScheme.errorContainer
         : isUser
-            ? colorScheme.primaryContainer
-            : colorScheme.surfaceContainerHighest;
+            ? theme.colorScheme.primary
+            : Colors.white;
     final textColor = isError
-        ? colorScheme.onErrorContainer
+        ? theme.colorScheme.onErrorContainer
         : isUser
-            ? colorScheme.onPrimaryContainer
-            : colorScheme.onSurface;
+            ? Colors.white
+            : theme.colorScheme.onSurface;
 
     return Align(
       alignment: alignment,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Card(
-          color: backgroundColor,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message.text.isEmpty && message.isStreaming
-                      ? '...'
-                      : message.text,
-                  style: theme.textTheme.bodyMedium?.copyWith(color: textColor),
-                ),
-                if (message.isStreaming) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'streaming',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: textColor.withOpacity(0.7),
-                    ),
-                  ),
-                ],
-              ],
+        constraints: const BoxConstraints(maxWidth: 430),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(24),
+              topRight: const Radius.circular(24),
+              bottomLeft: Radius.circular(isUser ? 24 : 8),
+              bottomRight: Radius.circular(isUser ? 8 : 24),
             ),
+            border: isUser || isError
+                ? null
+                : Border.all(color: const Color(0xFFDCE7F6)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x110E1A2B),
+                blurRadius: 14,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                message.text.isEmpty && message.isStreaming
+                    ? '...'
+                    : message.text,
+                style: theme.textTheme.bodyMedium?.copyWith(color: textColor),
+              ),
+              if (message.isStreaming) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Streaming response',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: textColor.withOpacity(0.75),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),

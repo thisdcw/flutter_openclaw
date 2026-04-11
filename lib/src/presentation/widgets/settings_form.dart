@@ -26,6 +26,8 @@ class SettingsForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -33,43 +35,53 @@ class SettingsForm extends StatelessWidget {
           controller: gatewayUrlController,
           decoration: const InputDecoration(labelText: 'Gateway URL'),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         TextField(
           controller: authTokenController,
           decoration: const InputDecoration(labelText: 'Auth Token'),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         TextField(
           controller: sessionIdController,
           decoration: const InputDecoration(labelText: 'Session ID'),
         ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: localeController,
-          decoration: const InputDecoration(labelText: 'Locale'),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: localeController,
+                decoration: const InputDecoration(labelText: 'Locale'),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: TextField(
+                controller: timeoutController,
+                decoration: const InputDecoration(labelText: 'Timeout'),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: timeoutController,
-          decoration: const InputDecoration(labelText: 'Timeout'),
-          keyboardType: TextInputType.number,
-        ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 22),
         Wrap(
           spacing: 12,
           runSpacing: 12,
           children: [
-            FilledButton(
+            FilledButton.icon(
               onPressed: () {
                 onSave();
               },
-              child: const Text('Save Settings'),
+              icon: const Icon(Icons.save_rounded),
+              label: const Text('Save Settings'),
             ),
-            FilledButton(
+            FilledButton.tonalIcon(
               onPressed: () {
                 onTestConnection();
               },
-              child: const Text('Test Connection'),
+              icon: const Icon(Icons.wifi_tethering_rounded),
+              label: const Text('Test Connection'),
             ),
             OutlinedButton(
               onPressed: () {
@@ -81,6 +93,9 @@ class SettingsForm extends StatelessWidget {
               onPressed: () {
                 onResetDeviceIdentity();
               },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: theme.colorScheme.onErrorContainer,
+              ),
               child: const Text('Reset Device Identity'),
             ),
           ],

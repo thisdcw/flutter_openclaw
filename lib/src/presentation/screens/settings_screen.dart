@@ -55,55 +55,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final connectionController = widget.connectionController;
     final deviceId = connectionController.status.deviceId ?? 'pending-device';
 
     return Scaffold(
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Text(
-              'OpenClaw Gateway',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 16),
-            ConnectionSummaryCard(
-              phase: connectionController.phase,
-              deviceId: deviceId,
-              scopes: connectionController.grantedScopes,
-            ),
-            if ((connectionController.errorMessage ?? '').isNotEmpty) ...[
-              const SizedBox(height: 12),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFEAF3FF), Color(0xFFF6F9FD), Color(0xFFF3F7FC)],
+          ),
+        ),
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+            children: [
+              _HeroCard(
+                title: 'OpenClaw Assistant',
+                subtitle:
+                    'Connect your gateway and start chatting with OpenClaw.',
+                phase: connectionController.phase,
+                sessionId: sessionIdController.text,
+              ),
+              const SizedBox(height: 18),
+              ConnectionSummaryCard(
+                phase: connectionController.phase,
+                deviceId: deviceId,
+                scopes: connectionController.grantedScopes,
+              ),
+              if ((connectionController.errorMessage ?? '').isNotEmpty) ...[
+                const SizedBox(height: 14),
+                _InlineBanner(message: connectionController.errorMessage!),
+              ],
+              const SizedBox(height: 18),
               Card(
-                color: Theme.of(context).colorScheme.errorContainer,
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text(connectionController.errorMessage!),
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Gateway Configuration',
+                        style: theme.textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Keep the connection details up to date before testing or chatting.',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 18),
+                      SettingsForm(
+                        gatewayUrlController: gatewayUrlController,
+                        authTokenController: authTokenController,
+                        sessionIdController: sessionIdController,
+                        localeController: localeController,
+                        timeoutController: timeoutController,
+                        onSave: _saveSettings,
+                        onTestConnection: _testConnection,
+                        onClearDeviceToken: _clearDeviceToken,
+                        onResetDeviceIdentity: _resetDeviceIdentity,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ],
-            const SizedBox(height: 20),
-            SettingsForm(
-              gatewayUrlController: gatewayUrlController,
-              authTokenController: authTokenController,
-              sessionIdController: sessionIdController,
-              localeController: localeController,
-              timeoutController: timeoutController,
-              onSave: _saveSettings,
-              onTestConnection: _testConnection,
-              onClearDeviceToken: _clearDeviceToken,
-              onResetDeviceIdentity: _resetDeviceIdentity,
-            ),
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton(
+              const SizedBox(height: 18),
+              FilledButton.icon(
                 onPressed: _openChat,
-                child: const Text('Open Chat'),
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: const Text('Open Chat'),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -169,6 +194,111 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (context) => ChatScreen(
           chatController: widget.chatController,
           connectionController: widget.connectionController,
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroCard extends StatelessWidget {
+  const _HeroCard({
+    required this.title,
+    required this.subtitle,
+    required this.phase,
+    required this.sessionId,
+  });
+
+  final String title;
+  final String subtitle;
+  final String phase;
+  final String sessionId;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.78),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: theme.textTheme.headlineMedium),
+          const SizedBox(height: 10),
+          Text(
+            subtitle,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.textTheme.bodySmall?.color,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _HeroStat(label: 'Phase', value: phase),
+              _HeroStat(label: 'Session', value: sessionId),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroStat extends StatelessWidget {
+  const _HeroStat({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF5FF),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: theme.textTheme.labelMedium),
+          const SizedBox(height: 4),
+          Text(value, style: theme.textTheme.titleMedium),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineBanner extends StatelessWidget {
+  const _InlineBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Text(
+        message,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onErrorContainer,
         ),
       ),
     );

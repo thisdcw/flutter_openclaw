@@ -15,6 +15,7 @@ class OpenClawApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'OpenClaw',
       theme: buildAppTheme(),
       home: SettingsScreen(
