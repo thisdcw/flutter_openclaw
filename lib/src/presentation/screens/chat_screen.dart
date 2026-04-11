@@ -1,8 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../application/controllers/chat_controller.dart';
 import '../../application/controllers/connection_controller.dart';
 import '../../application/controllers/settings_controller.dart';
+import '../../domain/models/chat_draft.dart';
+import '../../domain/models/connection_status.dart';
+import '../../domain/models/selected_image_attachment.dart';
 import '../../infrastructure/util/openclaw_logger.dart';
 import '../widgets/chat_composer.dart';
 import '../widgets/message_bubble.dart';
@@ -27,15 +35,24 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   late final TextEditingController composerController;
+  late final ImagePicker imagePicker;
+  final List<SelectedImageAttachment> pendingAttachments = [];
+  final Uuid uuid = Uuid();
 
   @override
   void initState() {
     super.initState();
     composerController = TextEditingController();
+    composerController.addListener(_handleComposerChange);
+    imagePicker = ImagePicker();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(widget.connectionController.connectIfNeeded());
+    });
   }
 
   @override
   void dispose() {
+    composerController.removeListener(_handleComposerChange);
     composerController.dispose();
     super.dispose();
   }
@@ -49,24 +66,28 @@ class _ChatScreenState extends State<ChatScreen> {
       ]),
       builder: (context, _) {
         final theme = Theme.of(context);
+        final connectionStatus = widget.connectionController.status;
+        final isConnecting = _isConnectingPhase(connectionStatus.phase);
+        final showConnectionStrip = !connectionStatus.isReady;
         final blockedReason = widget.connectionController.sendBlockedReason;
         final messages = widget.chatController.messages;
+        final hasDraftContent = composerController.text.trim().isNotEmpty ||
+            pendingAttachments.isNotEmpty;
+        final connectionTitle = _connectionTitle(
+          connectionStatus,
+          isConnecting,
+        );
+        final connectionSubtitle = _connectionSubtitle(
+          connectionStatus,
+          isConnecting,
+        );
 
         return Scaffold(
           appBar: AppBar(
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('OpenClaw Chat', style: theme.textTheme.titleLarge),
-                Text(
-                  'Your connected AI assistant workspace',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ),
+            title: Text('OpenClaw Chat', style: theme.textTheme.titleMedium),
             actions: [
               StatusBadge(label: widget.connectionController.phase),
-              const SizedBox(width: 10),
+              const SizedBox(width: 6),
               IconButton(
                 onPressed: widget.settingsController == null
                     ? null
@@ -87,29 +108,31 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             child: SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (blockedReason.isNotEmpty) ...[
-                      _SetupPromptCard(
-                        title: 'OpenClaw is not ready yet',
-                        description:
-                            'Your assistant needs connection or permission setup before it can send messages.',
-                        buttonLabel: 'Open Settings',
-                        onPressed: widget.settingsController == null
-                            ? null
-                            : _openSettings,
+                    if (showConnectionStrip) ...[
+                      _ConnectionStrip(
+                        title: connectionTitle,
+                        subtitle: connectionSubtitle,
+                        showButton: !isConnecting,
+                        onPressed: () {
+                          unawaited(
+                            widget.connectionController.testConnection(),
+                          );
+                        },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                     ],
-                    if (blockedReason.isNotEmpty) ...[
+                    if (connectionStatus.isReady &&
+                        blockedReason.isNotEmpty) ...[
                       _ChatBanner(
                         message: blockedReason,
                         color: const Color(0xFFFFF2D9),
                         textColor: const Color(0xFF8A5A00),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                     ],
                     if ((widget.chatController.errorMessage ?? '').isNotEmpty) ...[
                       _ChatBanner(
@@ -117,35 +140,48 @@ class _ChatScreenState extends State<ChatScreen> {
                         color: theme.colorScheme.errorContainer,
                         textColor: theme.colorScheme.onErrorContainer,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                     ],
                     Expanded(
                       child: Container(
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.72),
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: theme.colorScheme.outline),
+                          color: Colors.white.withOpacity(0.52),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: theme.colorScheme.outline.withOpacity(0.45),
+                          ),
                         ),
                         child: messages.isEmpty
                             ? const _ChatEmptyState()
                             : ListView.separated(
+                                padding: EdgeInsets.zero,
                                 itemCount: messages.length,
                                 separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 8),
+                                    const SizedBox(height: 4),
                                 itemBuilder: (context, index) {
                                   return MessageBubble(message: messages[index]);
                                 },
                               ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 8),
                     ChatComposer(
                       controller: composerController,
                       enabled: widget.connectionController.canSend,
+                      hasContent: hasDraftContent,
                       isSending: widget.chatController.isSending,
+                      attachments: pendingAttachments,
+                      onPickImages: _pickImages,
+                      onRemoveAttachment: _removeAttachment,
                       onSend: () async {
                         final text = composerController.text;
+                        if (!hasDraftContent) {
+                          return;
+                        }
                         openClawLog(
                           'ChatScreen',
                           'composer send tapped',
@@ -156,8 +192,17 @@ class _ChatScreenState extends State<ChatScreen> {
                             'preview': truncateForLog(text, maxLength: 80),
                           },
                         );
-                        await widget.chatController.send(text);
+                        await widget.chatController.send(
+                          ChatDraft(
+                            text: text,
+                            attachments: pendingAttachments,
+                          ),
+                        );
+                        if (!mounted) {
+                          return;
+                        }
                         composerController.clear();
+                        setState(pendingAttachments.clear);
                       },
                     ),
                   ],
@@ -185,6 +230,144 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
+
+  void _handleComposerChange() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {});
+  }
+
+  Future<void> _pickImages() async {
+    try {
+      final files = await imagePicker.pickMultiImage();
+      if (files.isEmpty) {
+        return;
+      }
+      final newAttachments = <SelectedImageAttachment>[];
+      for (final file in files) {
+        final bytes = await file.readAsBytes();
+        newAttachments.add(
+          SelectedImageAttachment(
+            id: uuid.v4(),
+            fileName: file.name,
+            mimeType: _inferMimeType(file.name),
+            bytes: bytes,
+          ),
+        );
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        pendingAttachments.addAll(newAttachments);
+      });
+    } on PlatformException catch (error, stackTrace) {
+      openClawLog(
+        'ChatScreen',
+        'pick images failed: platform exception',
+        fields: <String, Object?>{
+          'code': error.code,
+          'message': error.message,
+          'details': error.details?.toString(),
+          'stackTrace': stackTrace.toString(),
+        },
+      );
+      _presentPickerError(
+        error.code == 'channel-error'
+            ? '图片选择器未完成原生注册，请完整重新启动应用后再试。'
+            : '选择图片失败，请稍后重试。',
+      );
+    } on MissingPluginException catch (error, stackTrace) {
+      openClawLog(
+        'ChatScreen',
+        'pick images failed: missing plugin',
+        fields: <String, Object?>{
+          'error': error.toString(),
+          'stackTrace': stackTrace.toString(),
+        },
+      );
+      _presentPickerError('图片选择器插件不可用，请完整重新启动应用后再试。');
+    } catch (error, stackTrace) {
+      openClawLog(
+        'ChatScreen',
+        'pick images failed',
+        fields: <String, Object?>{
+          'error': error.toString(),
+          'stackTrace': stackTrace.toString(),
+        },
+      );
+      _presentPickerError('选择图片失败，请稍后重试。');
+    }
+  }
+
+  void _removeAttachment(SelectedImageAttachment attachment) {
+    setState(() {
+      pendingAttachments.remove(attachment);
+    });
+  }
+
+  void _presentPickerError(String message) {
+    widget.chatController.errorMessage = message;
+    widget.chatController.notifyListeners();
+  }
+
+  static String _inferMimeType(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.png')) {
+      return 'image/png';
+    }
+    if (lower.endsWith('.webp')) {
+      return 'image/webp';
+    }
+    if (lower.endsWith('.gif')) {
+      return 'image/gif';
+    }
+    return 'image/jpeg';
+  }
+
+  static bool _isConnectingPhase(ConnectionPhase phase) {
+    switch (phase) {
+      case ConnectionPhase.connecting:
+      case ConnectionPhase.waitingChallenge:
+      case ConnectionPhase.authenticating:
+      case ConnectionPhase.reconnecting:
+        return true;
+      case ConnectionPhase.idle:
+      case ConnectionPhase.ready:
+      case ConnectionPhase.failed:
+        return false;
+    }
+  }
+
+  static String _connectionTitle(
+    ConnectionStatus status,
+    bool isConnecting,
+  ) {
+    if (isConnecting) {
+      return 'Connecting to gateway…';
+    }
+    if (status.failure != null) {
+      return status.failure!.message;
+    }
+    return 'Connect to gateway to start chatting.';
+  }
+
+  static String _connectionSubtitle(
+    ConnectionStatus status,
+    bool isConnecting,
+  ) {
+    if (isConnecting) {
+      return '';
+    }
+    if (status.failure != null) {
+      return 'Check your gateway settings and tap Connection to retry.';
+    }
+    if (!status.isReady) {
+      return 'Status: ${status.phase.value}.';
+    }
+    return '';
+  }
 }
 
 class _ChatBanner extends StatelessWidget {
@@ -201,10 +384,10 @@ class _ChatBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Text(
         message,
@@ -223,13 +406,13 @@ class _ChatEmptyState extends StatelessWidget {
     final theme = Theme.of(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 64,
-              height: 64,
+              width: 52,
+              height: 52,
               decoration: const BoxDecoration(
                 color: Color(0xFFEAF2FF),
                 shape: BoxShape.circle,
@@ -239,10 +422,10 @@ class _ChatEmptyState extends StatelessWidget {
                 color: Color(0xFF2F6BFF),
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             Text(
               'Ask anything once your gateway is ready.',
-              style: theme.textTheme.titleLarge,
+              style: theme.textTheme.titleMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -258,61 +441,72 @@ class _ChatEmptyState extends StatelessWidget {
   }
 }
 
-class _SetupPromptCard extends StatelessWidget {
-  const _SetupPromptCard({
+class _ConnectionStrip extends StatelessWidget {
+  const _ConnectionStrip({
     required this.title,
-    required this.description,
-    required this.buttonLabel,
+    required this.subtitle,
+    required this.showButton,
     this.onPressed,
   });
 
   final String title;
-  final String description;
-  final String buttonLabel;
+  final String subtitle;
+  final bool showButton;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF2FF),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.outline),
+        color: const Color(0xFFEFF4FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.5)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF2F6BFF),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.tips_and_updates_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(title, style: theme.textTheme.titleMedium),
-              ),
-            ],
+          Container(
+            width: 28,
+            height: 28,
+            decoration: const BoxDecoration(
+              color: Color(0xFF2F6BFF),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.wifi_tethering_rounded,
+              color: Colors.white,
+              size: 14,
+            ),
           ),
-          const SizedBox(height: 10),
-          Text(description, style: theme.textTheme.bodyMedium),
-          const SizedBox(height: 14),
-          FilledButton.icon(
-            onPressed: onPressed,
-            icon: const Icon(Icons.settings_rounded),
-            label: Text(buttonLabel),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(title, style: theme.textTheme.titleSmall),
+                if (subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: theme.textTheme.bodySmall),
+                ],
+              ],
+            ),
           ),
+          if (showButton) ...[
+            const SizedBox(width: 10),
+            OutlinedButton(
+              onPressed: onPressed,
+              style: OutlinedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('Connection'),
+            ),
+          ],
         ],
       ),
     );

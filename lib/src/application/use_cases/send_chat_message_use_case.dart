@@ -1,3 +1,4 @@
+import '../../domain/models/chat_draft.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/gateway_config.dart';
 import '../../infrastructure/gateway/gateway_protocol_parser.dart';
@@ -16,17 +17,19 @@ class SendChatMessageUseCase {
   final GatewayProtocolParser _parser;
 
   Stream<ChatMessage> call(
-    String text, {
+    ChatDraft draft, {
     required GatewayConfig config,
   }) async* {
+    final normalizedText = draft.normalizedText;
     openClawLog(
       'SendChatMessage',
       'send flow start',
       fields: <String, Object?>{
         'gatewayUrl': config.gatewayUrl,
         'sessionId': config.sessionId,
-        'textLength': text.length,
-        'preview': truncateForLog(text, maxLength: 80),
+        'textLength': normalizedText.length,
+        'attachmentCount': draft.attachments.length,
+        'preview': truncateForLog(normalizedText, maxLength: 80),
       },
     );
     final session = await _testConnectionUseCase.connect(config: config);
@@ -45,7 +48,7 @@ class SendChatMessageUseCase {
         parser: _parser,
         timeout: Duration(milliseconds: config.timeoutMs),
       );
-      yield* repository.sendMessage(text, sessionId: config.sessionId);
+      yield* repository.sendMessage(draft, sessionId: config.sessionId);
     } finally {
       openClawLog('SendChatMessage', 'dispose authenticated session');
       await session.dispose();

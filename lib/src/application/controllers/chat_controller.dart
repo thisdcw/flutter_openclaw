@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../domain/models/chat_draft.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/gateway_config.dart';
 import '../../domain/repositories/chat_repository.dart';
@@ -36,18 +37,19 @@ class ChatController extends ChangeNotifier {
 
   List<ChatMessage> get messages => List<ChatMessage>.unmodifiable(_messages);
 
-  Future<void> send(String text) async {
-    final normalized = text.trim();
-    if (normalized.isEmpty) {
-      openClawLog('ChatController', 'send ignored: empty text');
+  Future<void> send(ChatDraft draft) async {
+    if (!draft.hasSendableContent) {
+      openClawLog('ChatController', 'send ignored: empty draft');
       return;
     }
 
+    final normalized = draft.normalizedText;
     openClawLog(
       'ChatController',
       'send begin',
       fields: <String, Object?>{
         'messageLength': normalized.length,
+        'attachmentCount': draft.attachments.length,
         'preview': truncateForLog(normalized, maxLength: 80),
       },
     );
@@ -58,6 +60,7 @@ class ChatController extends ChangeNotifier {
         id: 'user-${_messages.length}',
         role: MessageRole.user,
         text: normalized,
+        attachments: draft.attachments,
       ),
     );
     notifyListeners();
@@ -66,9 +69,19 @@ class ChatController extends ChangeNotifier {
     final sendChatMessageUseCase = _sendChatMessageUseCase;
     final configProvider = _configProvider;
     final sessionIdProvider = _sessionIdProvider;
-    if (repository == null &&
-        (sendChatMessageUseCase == null || configProvider == null)) {
-      openClawLog('ChatController', 'send skipped: no repository/use case');
+    final hasUseCase = sendChatMessageUseCase != null && configProvider != null;
+    final hasRepository = repository != null;
+    final canUseRepository = hasRepository && sessionIdProvider != null;
+    if (!hasUseCase && !canUseRepository) {
+      openClawLog(
+        'ChatController',
+        'send skipped: missing send pathway',
+        fields: <String, Object?>{
+          'hasUseCase': hasUseCase,
+          'hasRepository': hasRepository,
+          'hasSessionIdProvider': sessionIdProvider != null,
+        },
+      );
       isSending = false;
       errorMessage = null;
       notifyListeners();
@@ -77,13 +90,13 @@ class ChatController extends ChangeNotifier {
 
     try {
       errorMessage = null;
-      final stream = sendChatMessageUseCase != null && configProvider != null
+      final stream = hasUseCase
           ? sendChatMessageUseCase.call(
-              normalized,
+              draft,
               config: configProvider(),
             )
           : repository!.sendMessage(
-              normalized,
+              draft,
               sessionId: sessionIdProvider!(),
             );
 

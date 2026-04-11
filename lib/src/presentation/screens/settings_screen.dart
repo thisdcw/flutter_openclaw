@@ -80,7 +80,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Text('Settings', style: theme.textTheme.headlineMedium),
                         const SizedBox(height: 8),
                         Text(
-                          'Manage your connection and gateway configuration.',
+                          'Review live connection state and tune your chat session configuration.',
                           style: theme.textTheme.bodySmall,
                         ),
                       ],
@@ -118,20 +118,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Keep the connection details up to date before testing or chatting.',
+                        'Keep the chat session details up to date. Connection can be retried directly from the chat page when needed.',
                         style: theme.textTheme.bodySmall,
                       ),
                       const SizedBox(height: 18),
                       SettingsForm(
-                        gatewayUrlController: gatewayUrlController,
-                        authTokenController: authTokenController,
                         sessionIdController: sessionIdController,
                         localeController: localeController,
                         timeoutController: timeoutController,
                         onSave: _saveSettings,
-                        onTestConnection: _testConnection,
-                        onClearDeviceToken: _clearDeviceToken,
-                        onResetDeviceIdentity: _resetDeviceIdentity,
                       ),
                     ],
                   ),
@@ -169,27 +164,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     await widget.settingsController.save(next);
   }
-
-  Future<void> _testConnection() async {
-    openClawLog('SettingsScreen', 'test connection tapped');
-    await _saveSettings();
-    await widget.connectionController.testConnection();
-  }
-
-  Future<void> _clearDeviceToken() async {
-    openClawLog('SettingsScreen', 'clear device token tapped');
-    await widget.settingsController.clearDeviceToken();
-    widget.connectionController.reset(
-      deviceId: widget.connectionController.status.deviceId,
-    );
-  }
-
-  Future<void> _resetDeviceIdentity() async {
-    openClawLog('SettingsScreen', 'reset device identity tapped');
-    await widget.settingsController.resetDeviceIdentity();
-    widget.connectionController.reset();
-  }
-
 }
 
 class _InlineBanner extends StatelessWidget {

@@ -8,16 +8,54 @@ import 'package:flutter_openclaw/src/app/app_dependencies.dart';
 import 'package:flutter_openclaw/src/presentation/screens/chat_screen.dart';
 
 void main() {
-  testWidgets('settings screen shows config fields and reset actions',
-      (WidgetTester tester) async {
+  testWidgets('chat screen is the home view', (WidgetTester tester) async {
     await tester.pumpWidget(OpenClawApp(dependencies: AppDependencies.fake()));
 
-    expect(find.text('Gateway URL'), findsOneWidget);
-    expect(find.text('Auth Token'), findsOneWidget);
-    expect(find.text('Reset Device Identity'), findsOneWidget);
+    expect(find.text('OpenClaw Chat'), findsOneWidget);
   });
 
-  testWidgets('chat composer is disabled when operator.write is missing',
+  testWidgets('failed connection shows strip and Connection button',
+      (WidgetTester tester) async {
+    final connectionController = ConnectionController.fake()
+      ..markFailed('Gateway unavailable');
+    final chatController = ChatController.fake();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatScreen(
+          chatController: chatController,
+          connectionController: connectionController,
+        ),
+      ),
+    );
+
+    expect(find.text('Gateway unavailable'), findsOneWidget);
+    expect(
+      find.text('Check your gateway settings and tap Connection to retry.'),
+      findsOneWidget,
+    );
+    expect(find.text('Connection'), findsOneWidget);
+  });
+
+  testWidgets('connecting state shows strip text and no Connection button',
+      (WidgetTester tester) async {
+    final connectionController = ConnectionController.fake()..markConnecting();
+    final chatController = ChatController.fake();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatScreen(
+          chatController: chatController,
+          connectionController: connectionController,
+        ),
+      ),
+    );
+
+    expect(find.text('Connecting to gateway…'), findsOneWidget);
+    expect(find.text('Connection'), findsNothing);
+  });
+
+  testWidgets('ready but blocked shows reason and no Connection button',
       (WidgetTester tester) async {
     final connectionController = ConnectionController.fake()
       ..phase = 'ready'
@@ -34,5 +72,6 @@ void main() {
     );
 
     expect(find.text('missing scope: operator.write'), findsOneWidget);
+    expect(find.text('Connection'), findsNothing);
   });
 }

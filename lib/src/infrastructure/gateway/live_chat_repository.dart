@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:uuid/uuid.dart';
 
+import '../../domain/models/chat_draft.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_request_state.dart';
 import '../../domain/repositories/chat_repository.dart';
@@ -32,7 +33,7 @@ class LiveChatRepository implements ChatRepository {
 
   @override
   Stream<ChatMessage> sendMessage(
-    String text, {
+    ChatDraft draft, {
     required String sessionId,
   }) {
     _client.start();
@@ -41,13 +42,18 @@ class LiveChatRepository implements ChatRepository {
     final requestId = 'req-${_uuid.v4()}';
     final assistantMessageId = 'assistant-$requestId';
     final request = _tracker.create(requestId: requestId);
+    final normalizedText = draft.normalizedText;
+    final contentParts = draft.toGatewayContent();
     openClawLog(
       'ChatRepository',
       'create chat request',
       fields: <String, Object?>{
         'requestId': requestId,
         'sessionId': sessionId,
-        'textPreview': truncateForLog(text, maxLength: 80),
+        'textLength': normalizedText.length,
+        'attachmentCount': draft.attachments.length,
+        'contentParts': contentParts.length,
+        'textPreview': truncateForLog(normalizedText, maxLength: 80),
         'timeoutMs': _timeout.inMilliseconds,
       },
     );
@@ -82,6 +88,16 @@ class LiveChatRepository implements ChatRepository {
         },
       );
       request.finished = true;
+      if (request.streamedText.isNotEmpty) {
+        controller.add(
+          ChatMessage(
+            id: assistantMessageId,
+            role: MessageRole.assistant,
+            text: request.streamedText,
+            isStreaming: false,
+          ),
+        );
+      }
       disposeRequest();
       controller.addError(error, stackTrace);
       unawaited(controller.close());
@@ -92,9 +108,8 @@ class LiveChatRepository implements ChatRepository {
       if (controller.isClosed || request.finished) {
         return;
       }
-
-      final normalized = text.trim();
-      if (normalized.isEmpty) {
+      final messageText = isStreaming ? text : text.trim();
+      if (!isStreaming && messageText.isEmpty) {
         finishWithError(StateError('收到空响应'));
         return;
       }
@@ -105,8 +120,8 @@ class LiveChatRepository implements ChatRepository {
         fields: <String, Object?>{
           'requestId': request.requestId,
           'runId': request.runId,
-          'textLength': normalized.length,
-          'preview': truncateForLog(normalized, maxLength: 120),
+          'textLength': messageText.length,
+          'preview': truncateForLog(messageText, maxLength: 120),
         },
       );
       request.finished = !isStreaming;
@@ -114,7 +129,7 @@ class LiveChatRepository implements ChatRepository {
         ChatMessage(
           id: assistantMessageId,
           role: MessageRole.assistant,
-          text: normalized,
+          text: messageText,
           isStreaming: isStreaming,
         ),
       );
@@ -178,7 +193,7 @@ class LiveChatRepository implements ChatRepository {
         'method': 'chat.send',
         'params': <String, Object?>{
           'sessionKey': sessionId,
-          'message': text,
+          'content': contentParts.map((part) => part.toJson()).toList(),
           'idempotencyKey': _uuid.v4(),
         },
       },

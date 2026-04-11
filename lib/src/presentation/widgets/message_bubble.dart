@@ -1,6 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../domain/models/chat_message.dart';
+import '../../domain/models/selected_image_attachment.dart';
+import 'message_content_parser.dart';
 
 class MessageBubble extends StatelessWidget {
   const MessageBubble({
@@ -26,44 +30,53 @@ class MessageBubble extends StatelessWidget {
         : isUser
             ? Colors.white
             : theme.colorScheme.onSurface;
+    final content = message.text.isEmpty && message.isStreaming
+        ? '...'
+        : message.text;
+    final segments = parseMessageContent(content);
+    final hasLocalAttachments = isUser && message.attachments.isNotEmpty;
+    final hasTextSegments = segments.isNotEmpty;
 
     return Align(
       alignment: alignment,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 430),
+        constraints: const BoxConstraints(maxWidth: 440),
         child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: backgroundColor,
             borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(24),
-              topRight: const Radius.circular(24),
-              bottomLeft: Radius.circular(isUser ? 24 : 8),
-              bottomRight: Radius.circular(isUser ? 8 : 24),
+              topLeft: const Radius.circular(18),
+              topRight: const Radius.circular(18),
+              bottomLeft: Radius.circular(isUser ? 18 : 6),
+              bottomRight: Radius.circular(isUser ? 6 : 18),
             ),
             border: isUser || isError
                 ? null
                 : Border.all(color: const Color(0xFFDCE7F6)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x110E1A2B),
-                blurRadius: 14,
-                offset: Offset(0, 6),
-              ),
-            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                message.text.isEmpty && message.isStreaming
-                    ? '...'
-                    : message.text,
-                style: theme.textTheme.bodyMedium?.copyWith(color: textColor),
-              ),
+              if (hasLocalAttachments) ...[
+                _UserAttachmentGrid(attachments: message.attachments),
+                if (hasTextSegments || message.isStreaming)
+                  const SizedBox(height: 8),
+              ],
+              for (var index = 0; index < segments.length; index++)
+                Padding(
+                  padding: EdgeInsets.only(
+                    bottom: index == segments.length - 1 ? 0 : 6,
+                  ),
+                  child: _MessageSegmentView(
+                    segment: segments[index],
+                    textColor: textColor,
+                    isUser: isUser,
+                  ),
+                ),
               if (message.isStreaming) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   'Streaming response',
                   style: theme.textTheme.labelMedium?.copyWith(
@@ -73,6 +86,118 @@ class MessageBubble extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UserAttachmentGrid extends StatelessWidget {
+  const _UserAttachmentGrid({required this.attachments});
+
+  final List<SelectedImageAttachment> attachments;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final attachment in attachments)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 78,
+              height: 78,
+              color: Colors.white.withOpacity(0.16),
+              child: Image.memory(
+                Uint8List.fromList(attachment.bytes),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Center(
+                    child: Text(
+                      attachment.fileName,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _MessageSegmentView extends StatelessWidget {
+  const _MessageSegmentView({
+    required this.segment,
+    required this.textColor,
+    required this.isUser,
+  });
+
+  final MessageContentSegment segment;
+  final Color textColor;
+  final bool isUser;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (segment is MessageTextSegment) {
+      final textSegment = segment as MessageTextSegment;
+      return Text(
+        textSegment.text,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: textColor,
+          height: 1.32,
+        ),
+      );
+    }
+
+    final imageSegment = segment as MessageImageSegment;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 220),
+        child: Image.network(
+          imageSegment.url,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) {
+              return child;
+            }
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              color: isUser
+                  ? Colors.white.withOpacity(0.18)
+                  : const Color(0xFFF2F6FB),
+              alignment: Alignment.center,
+              child: const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              color: isUser
+                  ? Colors.white.withOpacity(0.14)
+                  : const Color(0xFFF2F6FB),
+              child: Text(
+                imageSegment.altText ?? imageSegment.url,
+                style: theme.textTheme.bodySmall?.copyWith(color: textColor),
+              ),
+            );
+          },
         ),
       ),
     );

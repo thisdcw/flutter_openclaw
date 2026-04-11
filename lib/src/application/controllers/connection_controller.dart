@@ -25,16 +25,30 @@ class ConnectionController extends ChangeNotifier {
   final TestConnectionUseCase? _testConnectionUseCase;
   final GatewayConfig Function()? _configProvider;
   final bool _isStub;
+  bool _autoConnectInFlight = false;
+  bool _autoConnectSucceeded = false;
 
   bool get isStub => _isStub;
 
   String get phase => _status.phase.value;
 
   set phase(String value) {
-    _status = _status.copyWith(
-      phase: ConnectionPhase.fromValue(value),
-    );
-    notifyListeners();
+    try {
+      _status = _status.copyWith(
+        phase: ConnectionPhase.fromValue(value),
+      );
+      notifyListeners();
+    } on FormatException catch (error, stackTrace) {
+      openClawLog(
+        'ConnectionController',
+        'phase update ignored: unsupported value',
+        fields: <String, Object?>{
+          'value': value,
+          'error': error.toString(),
+          'stackTrace': stackTrace.toString(),
+        },
+      );
+    }
   }
 
   List<String> get grantedScopes =>
@@ -54,6 +68,53 @@ class ConnectionController extends ChangeNotifier {
   String get sendBlockedReason => _status.sendBlockedReason;
 
   ConnectionStatus get status => _status;
+
+  Future<void> connectIfNeeded() async {
+    if (_autoConnectSucceeded) {
+      openClawLog(
+        'ConnectionController',
+        'connectIfNeeded skipped: already connected',
+      );
+      return;
+    }
+    if (_autoConnectInFlight) {
+      openClawLog(
+        'ConnectionController',
+        'connectIfNeeded skipped: already in flight',
+      );
+      return;
+    }
+
+    if (_isStub) {
+      openClawLog('ConnectionController', 'connectIfNeeded skipped: stub');
+      return;
+    }
+    if (_status.isReady) {
+      _autoConnectSucceeded = true;
+      openClawLog('ConnectionController', 'connectIfNeeded skipped: already ready');
+      return;
+    }
+    if (_isInProgressPhase(_status.phase)) {
+      openClawLog(
+        'ConnectionController',
+        'connectIfNeeded skipped: connection in progress',
+        fields: <String, Object?>{
+          'phase': _status.phase.value,
+        },
+      );
+      return;
+    }
+
+    _autoConnectInFlight = true;
+    try {
+      await testConnection();
+      if (_status.isReady) {
+        _autoConnectSucceeded = true;
+      }
+    } finally {
+      _autoConnectInFlight = false;
+    }
+  }
 
   Future<void> testConnection() async {
     final useCase = _testConnectionUseCase;
@@ -87,12 +148,13 @@ class ConnectionController extends ChangeNotifier {
         },
       );
       notifyListeners();
-    } catch (error) {
+    } on Exception catch (error, stackTrace) {
       openClawLog(
         'ConnectionController',
         'testConnection failed',
         fields: <String, Object?>{
           'error': error.toString(),
+          'stackTrace': stackTrace.toString(),
         },
       );
       markFailed(error.toString(), code: 'CONNECT_FAILED');
@@ -141,5 +203,19 @@ class ConnectionController extends ChangeNotifier {
       deviceId: deviceId,
     );
     notifyListeners();
+  }
+
+  static bool _isInProgressPhase(ConnectionPhase phase) {
+    switch (phase) {
+      case ConnectionPhase.connecting:
+      case ConnectionPhase.waitingChallenge:
+      case ConnectionPhase.authenticating:
+      case ConnectionPhase.reconnecting:
+        return true;
+      case ConnectionPhase.idle:
+      case ConnectionPhase.ready:
+      case ConnectionPhase.failed:
+        return false;
+    }
   }
 }
