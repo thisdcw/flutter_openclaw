@@ -170,7 +170,14 @@ class _ChatScreenState extends State<ChatScreen> {
                       _ConnectionStrip(
                         title: connectionTitle,
                         subtitle: connectionSubtitle,
-                        showButton: !isConnecting && !isPairingFailure,
+                        showButton: !isConnecting,
+                        buttonLabel: connectionStatus.phase == ConnectionPhase.failed
+                            ? '重连'
+                            : isPairingFailure
+                                ? '重试'
+                            : l10n.connectionButtonLabel,
+                        emphasized:
+                            connectionStatus.phase == ConnectionPhase.failed,
                         onPressed: () {
                           unawaited(
                             widget.connectionController.testConnection(),
@@ -647,12 +654,16 @@ class _ConnectionStrip extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.showButton,
+    required this.buttonLabel,
+    this.emphasized = false,
     this.onPressed,
   });
 
   final String title;
   final String subtitle;
   final bool showButton;
+  final String buttonLabel;
+  final bool emphasized;
   final VoidCallback? onPressed;
 
   @override
@@ -697,16 +708,28 @@ class _ConnectionStrip extends StatelessWidget {
           ),
           if (showButton) ...[
             const SizedBox(width: 10),
-            OutlinedButton(
-              onPressed: onPressed,
-              style: OutlinedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            if (emphasized)
+              FilledButton(
+                onPressed: onPressed,
+                style: FilledButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(buttonLabel),
+              )
+            else
+              OutlinedButton(
+                onPressed: onPressed,
+                style: OutlinedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(buttonLabel),
               ),
-              child: Text(AppLocalizations.of(context)!.connectionButtonLabel),
-            ),
           ],
         ],
       ),

@@ -4,6 +4,8 @@ const List<String> defaultOperatorScopes = <String>[
   'operator.read',
   'operator.write',
   'operator.pairing',
+  'operator.admin',
+  'operator.talk.secrets',
 ];
 
 const GatewayConfig defaultGatewayConfig = GatewayConfig(
