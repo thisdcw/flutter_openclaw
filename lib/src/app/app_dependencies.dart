@@ -12,6 +12,7 @@ import 'package:flutter_openclaw/src/domain/models/connection_status.dart';
 import 'package:flutter_openclaw/src/infrastructure/crypto/connect_signer.dart';
 import 'package:flutter_openclaw/src/infrastructure/crypto/device_identity_service.dart';
 import 'package:flutter_openclaw/src/infrastructure/gateway/gateway_protocol_parser.dart';
+import 'package:flutter_openclaw/src/infrastructure/storage/shared_prefs_app_locale_preference_repository.dart';
 import 'package:flutter_openclaw/src/infrastructure/storage/secure_auth_repository.dart';
 import 'package:flutter_openclaw/src/infrastructure/storage/shared_prefs_config_repository.dart';
 
@@ -29,6 +30,8 @@ class AppDependencies {
   static Future<AppDependencies> create() async {
     final prefs = await SharedPreferences.getInstance();
     final configRepository = SharedPrefsConfigRepository(prefs);
+    final appLocalePreferenceRepository =
+        SharedPrefsAppLocalePreferenceRepository(prefs);
     final authRepository = SecureAuthRepository();
     final parser = const GatewayProtocolParser();
     final signer = const ConnectSigner();
@@ -39,6 +42,7 @@ class AppDependencies {
       identityService,
     );
     final bootstrapResult = await bootstrap.call();
+    final initialLocalePreference = await appLocalePreferenceRepository.load();
     final clearOperatorAuthUseCase = ClearOperatorAuthUseCase(authRepository);
     final resetDeviceIdentityUseCase = ResetDeviceIdentityUseCase(authRepository);
     final testConnectionUseCase = TestConnectionUseCase(
@@ -53,7 +57,9 @@ class AppDependencies {
     );
     final settingsController = SettingsController(
       initialConfig: bootstrapResult.config,
+      initialLocalePreference: initialLocalePreference,
       configRepository: configRepository,
+      appLocalePreferenceRepository: appLocalePreferenceRepository,
       clearOperatorAuthUseCase: clearOperatorAuthUseCase,
       resetDeviceIdentityUseCase: resetDeviceIdentityUseCase,
     );

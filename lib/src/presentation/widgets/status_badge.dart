@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_openclaw/l10n/app_localizations.dart';
+
+import '../localization/localized_gateway_text.dart';
 
 class StatusBadge extends StatelessWidget {
   const StatusBadge({
@@ -11,6 +14,7 @@ class StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final lower = label.toLowerCase();
     final background = lower == 'ready'
         ? const Color(0xFFE4F7EC)
@@ -30,7 +34,7 @@ class StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        label,
+        localizedPhaseLabel(l10n, label),
         style: theme.textTheme.labelMedium?.copyWith(
           color: foreground,
           fontWeight: FontWeight.w700,

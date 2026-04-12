@@ -1,9 +1,11 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_openclaw/l10n/app_localizations.dart';
 
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/selected_image_attachment.dart';
+import '../localization/localized_gateway_text.dart';
 import 'message_content_parser.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -20,6 +22,7 @@ class MessageBubble extends StatelessWidget {
     final isError = message.role == MessageRole.error;
     final alignment = isUser ? Alignment.centerRight : Alignment.centerLeft;
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final backgroundColor = isError
         ? theme.colorScheme.errorContainer
         : isUser
@@ -71,14 +74,16 @@ class MessageBubble extends StatelessWidget {
                   ),
                   child: _MessageSegmentView(
                     segment: segments[index],
+                    isError: isError,
                     textColor: textColor,
                     isUser: isUser,
+                    l10n: l10n,
                   ),
                 ),
               if (message.isStreaming) ...[
                 const SizedBox(height: 6),
                 Text(
-                  'Streaming response',
+                  l10n.streamingResponseLabel,
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: textColor.withOpacity(0.75),
                   ),
@@ -136,13 +141,17 @@ class _UserAttachmentGrid extends StatelessWidget {
 class _MessageSegmentView extends StatelessWidget {
   const _MessageSegmentView({
     required this.segment,
+    required this.isError,
     required this.textColor,
     required this.isUser,
+    required this.l10n,
   });
 
   final MessageContentSegment segment;
+  final bool isError;
   final Color textColor;
   final bool isUser;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -150,8 +159,14 @@ class _MessageSegmentView extends StatelessWidget {
 
     if (segment is MessageTextSegment) {
       final textSegment = segment as MessageTextSegment;
+      final localizedText = isError
+          ? localizedGatewayFailure(
+              l10n,
+              rawReason: textSegment.text,
+            )
+          : textSegment.text;
       return Text(
-        textSegment.text,
+        localizedText,
         style: theme.textTheme.bodyMedium?.copyWith(
           color: textColor,
           height: 1.32,

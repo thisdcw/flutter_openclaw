@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
+import '../../domain/models/app_locale_preference.dart';
 import '../../domain/models/gateway_config.dart';
+import '../../domain/repositories/app_locale_preference_repository.dart';
 import '../../domain/repositories/config_repository.dart';
 import '../../infrastructure/config/dev_defaults.dart';
 import '../../infrastructure/util/openclaw_logger.dart';
@@ -10,25 +12,39 @@ import '../use_cases/reset_device_identity_use_case.dart';
 class SettingsController extends ChangeNotifier {
   SettingsController({
     GatewayConfig? initialConfig,
+    AppLocalePreference initialLocalePreference =
+        AppLocalePreference.system,
     ConfigRepository? configRepository,
+    AppLocalePreferenceRepository? appLocalePreferenceRepository,
     ClearOperatorAuthUseCase? clearOperatorAuthUseCase,
     ResetDeviceIdentityUseCase? resetDeviceIdentityUseCase,
     bool isStub = false,
   })  : _config = initialConfig ?? defaultGatewayConfig,
+        _localePreference = initialLocalePreference,
         _configRepository = configRepository,
+        _appLocalePreferenceRepository = appLocalePreferenceRepository,
         _clearOperatorAuthUseCase = clearOperatorAuthUseCase,
         _resetDeviceIdentityUseCase = resetDeviceIdentityUseCase,
         _isStub = isStub;
 
-  factory SettingsController.fake() => SettingsController(isStub: true);
+  factory SettingsController.fake({
+    AppLocalePreference initialLocalePreference =
+        AppLocalePreference.system,
+  }) => SettingsController(
+        isStub: true,
+        initialLocalePreference: initialLocalePreference,
+      );
 
   GatewayConfig _config;
+  AppLocalePreference _localePreference;
   final ConfigRepository? _configRepository;
+  final AppLocalePreferenceRepository? _appLocalePreferenceRepository;
   final ClearOperatorAuthUseCase? _clearOperatorAuthUseCase;
   final ResetDeviceIdentityUseCase? _resetDeviceIdentityUseCase;
   final bool _isStub;
 
   GatewayConfig get config => _config;
+  AppLocalePreference get localePreference => _localePreference;
 
   bool get isStub => _isStub;
 
@@ -62,6 +78,15 @@ class SettingsController extends ChangeNotifier {
     );
     _config = next;
     await _configRepository?.save(next);
+    notifyListeners();
+  }
+
+  Future<void> saveLocalePreference(AppLocalePreference next) async {
+    if (_localePreference == next) {
+      return;
+    }
+    _localePreference = next;
+    await _appLocalePreferenceRepository?.save(next);
     notifyListeners();
   }
 

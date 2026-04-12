@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_openclaw/l10n/app_localizations.dart';
+
+import '../localization/localized_gateway_text.dart';
 
 class ConnectionSummaryCard extends StatelessWidget {
   const ConnectionSummaryCard({
@@ -15,6 +18,7 @@ class ConnectionSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Card(
       child: Padding(
@@ -22,10 +26,10 @@ class ConnectionSummaryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Connection Overview', style: theme.textTheme.titleLarge),
+            Text(l10n.connectionOverviewTitle, style: theme.textTheme.titleLarge),
             const SizedBox(height: 6),
             Text(
-              'Live connection state for this device and session.',
+              l10n.connectionOverviewSubtitle,
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 18),
@@ -33,11 +37,14 @@ class ConnectionSummaryCard extends StatelessWidget {
               spacing: 12,
               runSpacing: 12,
               children: [
-                _SummaryTile(label: 'Phase', value: phase),
-                _SummaryTile(label: 'Device ID', value: deviceId),
                 _SummaryTile(
-                  label: 'Granted Scopes',
-                  value: scopes.isEmpty ? '(none)' : scopes.join(', '),
+                  label: l10n.phaseLabel,
+                  value: localizedPhaseLabel(l10n, phase),
+                ),
+                _SummaryTile(label: l10n.deviceIdLabel, value: deviceId),
+                _SummaryTile(
+                  label: l10n.grantedScopesLabel,
+                  value: scopes.isEmpty ? l10n.noneLabel : scopes.join(', '),
                   isWide: true,
                 ),
               ],

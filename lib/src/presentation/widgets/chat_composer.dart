@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_openclaw/l10n/app_localizations.dart';
 
 import '../../domain/models/selected_image_attachment.dart';
 import 'attachment_preview_strip.dart';
@@ -30,6 +31,7 @@ class ChatComposer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final fieldEnabled = enabled && !isSending;
     final sendEnabled = fieldEnabled && hasContent;
 
@@ -58,7 +60,7 @@ class ChatComposer extends StatelessWidget {
                       }
                     : null,
                 icon: const Icon(Icons.photo_library_rounded),
-                tooltip: 'Add images',
+                tooltip: l10n.addImagesTooltip,
                 style: IconButton.styleFrom(
                   minimumSize: const Size(36, 36),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -71,14 +73,14 @@ class ChatComposer extends StatelessWidget {
                   enabled: fieldEnabled,
                   minLines: 1,
                   maxLines: 4,
-                  decoration: const InputDecoration(
-                    hintText: 'Message OpenClaw',
+                  decoration: InputDecoration(
+                    hintText: l10n.messageHint,
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
                     filled: false,
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(
+                    contentPadding: const EdgeInsets.symmetric(
                       horizontal: 4,
                       vertical: 8,
                     ),
@@ -99,7 +101,7 @@ class ChatComposer extends StatelessWidget {
                   ),
                   minimumSize: Size.zero,
                 ),
-                child: Text(isSending ? '...' : 'Send'),
+                child: Text(isSending ? l10n.sendingLabel : l10n.sendLabel),
               ),
             ],
           ),

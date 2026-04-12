@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_openclaw/l10n/app_localizations.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../application/controllers/chat_controller.dart';
@@ -12,6 +13,7 @@ import '../../domain/models/chat_draft.dart';
 import '../../domain/models/connection_status.dart';
 import '../../domain/models/selected_image_attachment.dart';
 import '../../infrastructure/util/openclaw_logger.dart';
+import '../localization/localized_gateway_text.dart';
 import '../widgets/chat_composer.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/status_badge.dart';
@@ -66,25 +68,32 @@ class _ChatScreenState extends State<ChatScreen> {
       ]),
       builder: (context, _) {
         final theme = Theme.of(context);
+        final l10n = AppLocalizations.of(context)!;
         final connectionStatus = widget.connectionController.status;
         final isConnecting = _isConnectingPhase(connectionStatus.phase);
         final showConnectionStrip = !connectionStatus.isReady;
-        final blockedReason = widget.connectionController.sendBlockedReason;
+        final blockedReason = localizedBlockedReason(
+          l10n,
+          widget.connectionController.sendBlockedReason,
+        );
+        final localizedFailureMessage = _localizedChatError(l10n);
         final messages = widget.chatController.messages;
         final hasDraftContent = composerController.text.trim().isNotEmpty ||
             pendingAttachments.isNotEmpty;
         final connectionTitle = _connectionTitle(
+          l10n,
           connectionStatus,
           isConnecting,
         );
         final connectionSubtitle = _connectionSubtitle(
+          l10n,
           connectionStatus,
           isConnecting,
         );
 
         return Scaffold(
           appBar: AppBar(
-            title: Text('OpenClaw Chat', style: theme.textTheme.titleMedium),
+            title: Text(l10n.chatScreenTitle, style: theme.textTheme.titleMedium),
             actions: [
               StatusBadge(label: widget.connectionController.phase),
               const SizedBox(width: 6),
@@ -93,7 +102,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ? null
                     : _openSettings,
                 icon: const Icon(Icons.settings_rounded),
-                tooltip: 'Open Settings',
+                tooltip: l10n.settingsOpenTooltip,
               ),
               const SizedBox(width: 16),
             ],
@@ -136,7 +145,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ],
                     if ((widget.chatController.errorMessage ?? '').isNotEmpty) ...[
                       _ChatBanner(
-                        message: widget.chatController.errorMessage!,
+                        message: localizedFailureMessage,
                         color: theme.colorScheme.errorContainer,
                         textColor: theme.colorScheme.onErrorContainer,
                       ),
@@ -156,7 +165,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                         child: messages.isEmpty
-                            ? const _ChatEmptyState()
+                            ? _ChatEmptyState(l10n: l10n)
                             : ListView.separated(
                                 padding: EdgeInsets.zero,
                                 itemCount: messages.length,
@@ -239,6 +248,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _pickImages() async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       final files = await imagePicker.pickMultiImage();
       if (files.isEmpty) {
@@ -275,8 +285,8 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       _presentPickerError(
         error.code == 'channel-error'
-            ? '图片选择器未完成原生注册，请完整重新启动应用后再试。'
-            : '选择图片失败，请稍后重试。',
+            ? l10n.pickerErrorChannel
+            : l10n.pickerErrorGeneric,
       );
     } on MissingPluginException catch (error, stackTrace) {
       openClawLog(
@@ -287,7 +297,7 @@ class _ChatScreenState extends State<ChatScreen> {
           'stackTrace': stackTrace.toString(),
         },
       );
-      _presentPickerError('图片选择器插件不可用，请完整重新启动应用后再试。');
+      _presentPickerError(l10n.pickerErrorUnavailable);
     } catch (error, stackTrace) {
       openClawLog(
         'ChatScreen',
@@ -297,7 +307,7 @@ class _ChatScreenState extends State<ChatScreen> {
           'stackTrace': stackTrace.toString(),
         },
       );
-      _presentPickerError('选择图片失败，请稍后重试。');
+      _presentPickerError(l10n.pickerErrorGeneric);
     }
   }
 
@@ -341,19 +351,21 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   static String _connectionTitle(
+    AppLocalizations l10n,
     ConnectionStatus status,
     bool isConnecting,
   ) {
     if (isConnecting) {
-      return 'Connecting to gateway…';
+      return l10n.connectionConnectingTitle;
     }
     if (status.failure != null) {
-      return status.failure!.message;
+      return localizedGatewayFailure(l10n, failure: status.failure);
     }
-    return 'Connect to gateway to start chatting.';
+    return l10n.connectionStartTitle;
   }
 
   static String _connectionSubtitle(
+    AppLocalizations l10n,
     ConnectionStatus status,
     bool isConnecting,
   ) {
@@ -361,12 +373,22 @@ class _ChatScreenState extends State<ChatScreen> {
       return '';
     }
     if (status.failure != null) {
-      return 'Check your gateway settings and tap Connection to retry.';
+      return l10n.connectionRetrySubtitle;
     }
     if (!status.isReady) {
-      return 'Status: ${status.phase.value}.';
+      return l10n.connectionStatusSubtitle(
+        localizedPhaseLabel(l10n, status.phase.value),
+      );
     }
     return '';
+  }
+
+  String _localizedChatError(AppLocalizations l10n) {
+    final rawError = widget.chatController.errorMessage ?? '';
+    if (rawError.isEmpty) {
+      return '';
+    }
+    return localizedGatewayFailure(l10n, rawReason: rawError);
   }
 }
 
@@ -399,7 +421,9 @@ class _ChatBanner extends StatelessWidget {
 }
 
 class _ChatEmptyState extends StatelessWidget {
-  const _ChatEmptyState();
+  const _ChatEmptyState({required this.l10n});
+
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -424,13 +448,13 @@ class _ChatEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              'Ask anything once your gateway is ready.',
+              l10n.chatEmptyTitle,
               style: theme.textTheme.titleMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              'Your assistant replies will stream here as soon as the connection is ready and operator.write is available.',
+              l10n.chatEmptySubtitle,
               style: theme.textTheme.bodySmall,
               textAlign: TextAlign.center,
             ),
@@ -504,7 +528,7 @@ class _ConnectionStrip extends StatelessWidget {
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: const Text('Connection'),
+              child: Text(AppLocalizations.of(context)!.connectionButtonLabel),
             ),
           ],
         ],

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_openclaw/l10n/app_localizations.dart';
 
 import '../../application/controllers/chat_controller.dart';
 import '../../application/controllers/connection_controller.dart';
 import '../../application/controllers/settings_controller.dart';
+import '../../domain/models/app_locale_preference.dart';
 import '../../domain/models/gateway_config.dart';
 import '../../infrastructure/util/openclaw_logger.dart';
 import '../widgets/connection_summary_card.dart';
@@ -30,11 +32,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final TextEditingController sessionIdController;
   late final TextEditingController localeController;
   late final TextEditingController timeoutController;
+  late AppLocalePreference localePreference;
 
   @override
   void initState() {
     super.initState();
     final config = widget.settingsController.config;
+    localePreference = widget.settingsController.localePreference;
     gatewayUrlController = TextEditingController(text: config.gatewayUrl);
     authTokenController = TextEditingController(text: config.authToken);
     sessionIdController = TextEditingController(text: config.sessionId);
@@ -55,8 +59,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final connectionController = widget.connectionController;
-    final deviceId = connectionController.status.deviceId ?? 'pending-device';
+    final deviceId = connectionController.status.deviceId ?? l10n.pendingDeviceLabel;
 
     return Scaffold(
       body: DecoratedBox(
@@ -77,10 +82,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Settings', style: theme.textTheme.headlineMedium),
+                        Text(l10n.settingsTitle, style: theme.textTheme.headlineMedium),
                         const SizedBox(height: 8),
                         Text(
-                          'Review live connection state and tune your chat session configuration.',
+                          l10n.settingsIntro,
                           style: theme.textTheme.bodySmall,
                         ),
                       ],
@@ -91,7 +96,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Navigator.of(context).maybePop();
                     },
                     icon: const Icon(Icons.close_rounded),
-                    tooltip: 'Close Settings',
+                    tooltip: l10n.settingsCloseTooltip,
                   ),
                 ],
               ),
@@ -113,19 +118,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Gateway Configuration',
+                        l10n.gatewayConfigurationTitle,
                         style: theme.textTheme.titleLarge,
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Keep the chat session details up to date. Connection can be retried directly from the chat page when needed.',
+                        l10n.gatewayConfigurationSubtitle,
                         style: theme.textTheme.bodySmall,
                       ),
                       const SizedBox(height: 18),
                       SettingsForm(
+                        localePreference: localePreference,
                         sessionIdController: sessionIdController,
                         localeController: localeController,
                         timeoutController: timeoutController,
+                        onLocalePreferenceChanged: (next) async {
+                          setState(() {
+                            localePreference = next;
+                          });
+                          await widget.settingsController.saveLocalePreference(
+                            next,
+                          );
+                        },
                         onSave: _saveSettings,
                       ),
                     ],

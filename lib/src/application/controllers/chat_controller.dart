@@ -4,7 +4,6 @@ import '../../domain/models/chat_draft.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/gateway_config.dart';
 import '../../domain/repositories/chat_repository.dart';
-import '../../infrastructure/util/failure_mapper.dart';
 import '../../infrastructure/util/openclaw_logger.dart';
 import '../use_cases/send_chat_message_use_case.dart';
 
@@ -114,29 +113,26 @@ class ChatController extends ChangeNotifier {
         _upsertAssistantMessage(message);
       }
     } catch (error) {
+      final rawReason = error.toString();
       _messages.removeWhere(
         (message) =>
             message.role == MessageRole.assistant &&
             message.isStreaming &&
             message.text.isEmpty,
       );
-      errorMessage = mapGatewayFailure(
-        code: 'CHAT_SEND_FAILED',
-        reason: error.toString(),
-      );
+      errorMessage = rawReason;
       openClawLog(
         'ChatController',
         'send failed',
         fields: <String, Object?>{
-          'error': error.toString(),
-          'mapped': errorMessage,
+          'error': rawReason,
         },
       );
       _messages.add(
         ChatMessage(
           id: 'error-${_messages.length}',
           role: MessageRole.error,
-          text: errorMessage!,
+          text: rawReason,
         ),
       );
       notifyListeners();
