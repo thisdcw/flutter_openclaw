@@ -4,6 +4,7 @@ import 'package:flutter_openclaw/l10n/app_localizations.dart';
 import '../../application/controllers/chat_controller.dart';
 import '../../application/controllers/connection_controller.dart';
 import '../../application/controllers/settings_controller.dart';
+import '../../app/app_metadata.dart';
 import '../../domain/models/app_locale_preference.dart';
 import '../widgets/connection_summary_card.dart';
 import '../widgets/error_notice_banner.dart';
@@ -159,6 +160,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ],
                   ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Center(
+                child: Column(
+                  children: [
+                    Text(
+                      appCopyrightText,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      appVersionText,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.82),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
