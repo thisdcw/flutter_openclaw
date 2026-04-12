@@ -148,7 +148,7 @@ class ConnectionController extends ChangeNotifier {
         },
       );
       notifyListeners();
-    } on Exception catch (error, stackTrace) {
+    } catch (error, stackTrace) {
       openClawLog(
         'ConnectionController',
         'testConnection failed',

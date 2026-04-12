@@ -118,7 +118,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatCommandDiscoveryPrompt =>
-      'Try `/new`, `/status`, `/model`, `/think`, or `/help` to see how commands behave.';
+      'Try `/new`, `/status`, or `/help` to see how commands behave.';
 
   @override
   String get connectionButtonLabel => 'Connection';
@@ -132,6 +132,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get connectionRetrySubtitle =>
       'Check your gateway settings and tap Connection to retry.';
+
+  @override
+  String get connectionPairingRequiredSubtitle =>
+      'Go to Settings, copy the device ID, and send it to an administrator for authorization.';
 
   @override
   String connectionStatusSubtitle(Object phase) {

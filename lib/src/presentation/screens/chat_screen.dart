@@ -11,6 +11,7 @@ import '../../application/controllers/connection_controller.dart';
 import '../../application/controllers/settings_controller.dart';
 import '../../domain/models/chat_draft.dart';
 import '../../domain/models/connection_status.dart';
+import '../../domain/models/gateway_failure.dart';
 import '../../domain/models/selected_image_attachment.dart';
 import '../../infrastructure/util/openclaw_logger.dart';
 import '../localization/localized_gateway_text.dart';
@@ -76,6 +77,8 @@ class _ChatScreenState extends State<ChatScreen> {
         final connectionStatus = widget.connectionController.status;
         final isConnecting = _isConnectingPhase(connectionStatus.phase);
         final showConnectionStrip = !connectionStatus.isReady;
+        final isPairingFailure =
+            connectionStatus.failure?.type == GatewayFailureType.pairingRequired;
         final blockedReason = localizedBlockedReason(
           l10n,
           widget.connectionController.sendBlockedReason,
@@ -134,7 +137,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       _ConnectionStrip(
                         title: connectionTitle,
                         subtitle: connectionSubtitle,
-                        showButton: !isConnecting,
+                        showButton: !isConnecting && !isPairingFailure,
                         onPressed: () {
                           unawaited(
                             widget.connectionController.testConnection(),
@@ -399,6 +402,9 @@ class _ChatScreenState extends State<ChatScreen> {
       return '';
     }
     if (status.failure != null) {
+      if (status.failure!.type == GatewayFailureType.pairingRequired) {
+        return l10n.connectionPairingRequiredSubtitle;
+      }
       return l10n.connectionRetrySubtitle;
     }
     if (!status.isReady) {

@@ -120,6 +120,9 @@ class GatewayFailure {
     }
 
     if (normalizedReason.contains('pairing') ||
+        normalizedReason.contains('no pair') ||
+        normalizedReason.contains('not-paired') ||
+        normalizedReason.contains('not paired') ||
         normalizedCode.contains('pairing')) {
       return GatewayFailureType.pairingRequired;
     }

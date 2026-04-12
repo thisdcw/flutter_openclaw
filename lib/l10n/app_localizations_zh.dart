@@ -114,7 +114,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatCommandDiscoveryPrompt =>
-      '试试 `/new`、`/status`、`/model`、`/think` 或 `/help` 来了解命令。';
+      '试试 `/new`、`/status` 或 `/help` 来了解命令。';
 
   @override
   String get connectionButtonLabel => '连接';
@@ -127,6 +127,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get connectionRetrySubtitle => '检查网关设置后，点击“连接”重试。';
+
+  @override
+  String get connectionPairingRequiredSubtitle => '去设置页面复制设备 ID 给管理员进行授权。';
 
   @override
   String connectionStatusSubtitle(Object phase) {

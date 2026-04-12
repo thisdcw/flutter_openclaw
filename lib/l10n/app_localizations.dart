@@ -305,7 +305,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatCommandDiscoveryPrompt.
   ///
   /// In en, this message translates to:
-  /// **'Try `/new`, `/status`, `/model`, `/think`, or `/help` to see how commands behave.'**
+  /// **'Try `/new`, `/status`, or `/help` to see how commands behave.'**
   String get chatCommandDiscoveryPrompt;
 
   /// No description provided for @connectionButtonLabel.
@@ -331,6 +331,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Check your gateway settings and tap Connection to retry.'**
   String get connectionRetrySubtitle;
+
+  /// No description provided for @connectionPairingRequiredSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Settings, copy the device ID, and send it to an administrator for authorization.'**
+  String get connectionPairingRequiredSubtitle;
 
   /// No description provided for @connectionStatusSubtitle.
   ///

@@ -34,11 +34,12 @@
   "saveSettingsLabel": "Save Settings",
   "chatEmptyTitle": "Ask anything once your gateway is ready.",
   "chatEmptySubtitle": "Your assistant replies will stream here as soon as the connection is ready and operator.write is available.",
-  "chatCommandDiscoveryPrompt": "Try `/new`, `/status`, `/model`, `/think`, or `/help` to see how commands behave.",
+  "chatCommandDiscoveryPrompt": "Try `/new`, `/status`, or `/help` to see how commands behave.",
   "connectionButtonLabel": "Connection",
   "connectionConnectingTitle": "Connecting to gateway…",
   "connectionStartTitle": "Connect to gateway to start chatting.",
   "connectionRetrySubtitle": "Check your gateway settings and tap Connection to retry.",
+  "connectionPairingRequiredSubtitle": "Go to Settings, copy the device ID, and send it to an administrator for authorization.",
   "connectionStatusSubtitle": "Status: {phase}.",
   "@connectionStatusSubtitle": {
     "placeholders": {

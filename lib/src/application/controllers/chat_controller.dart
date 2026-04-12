@@ -43,6 +43,7 @@ class ChatController extends ChangeNotifier {
     }
 
     final normalized = draft.normalizedText;
+    final shouldClearLocalHistory = _shouldClearLocalHistory(normalized);
     openClawLog(
       'ChatController',
       'send begin',
@@ -50,10 +51,14 @@ class ChatController extends ChangeNotifier {
         'messageLength': normalized.length,
         'attachmentCount': draft.attachments.length,
         'preview': truncateForLog(normalized, maxLength: 80),
+        'clearLocalHistory': shouldClearLocalHistory,
       },
     );
 
     isSending = true;
+    if (shouldClearLocalHistory) {
+      _messages.clear();
+    }
     _messages.add(
       ChatMessage(
         id: 'user-${_messages.length}',
@@ -151,5 +156,9 @@ class ChatController extends ChangeNotifier {
       _messages[index] = message;
     }
     notifyListeners();
+  }
+
+  static bool _shouldClearLocalHistory(String normalizedText) {
+    return normalizedText == '/new';
   }
 }

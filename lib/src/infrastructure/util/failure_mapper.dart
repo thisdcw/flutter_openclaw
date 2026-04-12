@@ -9,6 +9,9 @@ String mapGatewayFailure({
     return '当前设备缺少 operator.write 授权，请先完成配对或刷新授权。';
   }
   if (normalizedReason.contains('pairing') ||
+      normalizedReason.contains('no pair') ||
+      normalizedReason.contains('not-paired') ||
+      normalizedReason.contains('not paired') ||
       normalizedCode.contains('pairing')) {
     return '当前设备尚未完成配对授权。';
   }

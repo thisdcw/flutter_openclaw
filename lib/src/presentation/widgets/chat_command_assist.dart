@@ -62,20 +62,6 @@ final List<ChatCommandSuggestion> discoveryCommands = const [
     isDiscovery: true,
   ),
   ChatCommandSuggestion(
-    command: '/model',
-    descriptionKey: 'commandDescriptionModel',
-    groupKey: 'commandGroupSettingsLabel',
-    templateSuffix: ' ',
-    isDiscovery: true,
-  ),
-  ChatCommandSuggestion(
-    command: '/think',
-    descriptionKey: 'commandDescriptionThink',
-    groupKey: 'commandGroupSettingsLabel',
-    templateSuffix: ' ',
-    isDiscovery: true,
-  ),
-  ChatCommandSuggestion(
     command: '/help',
     descriptionKey: 'commandDescriptionHelp',
     groupKey: 'commandGroupStatusLabel',
@@ -113,18 +99,6 @@ final List<ChatCommandSuggestion> slashSuggestionCandidates = const [
     command: '/help',
     descriptionKey: 'commandDescriptionHelp',
     groupKey: 'commandGroupStatusLabel',
-  ),
-  ChatCommandSuggestion(
-    command: '/model',
-    templateSuffix: ' ',
-    descriptionKey: 'commandDescriptionModel',
-    groupKey: 'commandGroupSettingsLabel',
-  ),
-  ChatCommandSuggestion(
-    command: '/think',
-    templateSuffix: ' ',
-    descriptionKey: 'commandDescriptionThink',
-    groupKey: 'commandGroupSettingsLabel',
   ),
   ChatCommandSuggestion(
     command: '/fast',

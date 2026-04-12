@@ -34,11 +34,12 @@
   "saveSettingsLabel": "保存设置",
   "chatEmptyTitle": "Gateway 就绪后就可以开始提问。",
   "chatEmptySubtitle": "连接就绪并且具备 operator.write 权限后，助手回复会显示在这里。",
-  "chatCommandDiscoveryPrompt": "试试 `/new`、`/status`、`/model`、`/think` 或 `/help` 来了解命令。",
+  "chatCommandDiscoveryPrompt": "试试 `/new`、`/status` 或 `/help` 来了解命令。",
   "connectionButtonLabel": "连接",
   "connectionConnectingTitle": "正在连接 Gateway…",
   "connectionStartTitle": "连接 Gateway 后即可开始聊天。",
   "connectionRetrySubtitle": "检查网关设置后，点击“连接”重试。",
+  "connectionPairingRequiredSubtitle": "去设置页面复制设备 ID 给管理员进行授权。",
   "connectionStatusSubtitle": "当前状态：{phase}。",
   "@connectionStatusSubtitle": {
     "placeholders": {
