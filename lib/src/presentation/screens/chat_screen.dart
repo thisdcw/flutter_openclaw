@@ -18,6 +18,7 @@ import '../../infrastructure/util/openclaw_logger.dart';
 import '../localization/localized_gateway_text.dart';
 import '../widgets/chat_command_assist.dart';
 import '../widgets/chat_composer.dart';
+import '../widgets/conversation_list_sheet.dart';
 import '../widgets/error_notice_banner.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/status_badge.dart';
@@ -86,6 +87,7 @@ class _ChatScreenState extends State<ChatScreen> {
           widget.connectionController.sendBlockedReason,
         );
         final messages = widget.chatController.messages;
+        final activeConversation = widget.chatController.activeConversationSummary;
         final trimmedDraft = composerController.text.trimLeft();
         final commandHint = analyzeChatDraft(composerController.text).hintKind;
         final commandSuggestions = trimmedDraft.startsWith('/')
@@ -106,8 +108,38 @@ class _ChatScreenState extends State<ChatScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(l10n.chatScreenTitle, style: theme.textTheme.titleMedium),
+            leading: IconButton(
+              onPressed: _openConversationList,
+              icon: const Icon(Icons.chat_bubble_outline_rounded),
+              tooltip: 'Chats',
+            ),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  activeConversation?.title ?? l10n.chatScreenTitle,
+                  style: theme.textTheme.titleMedium,
+                ),
+                if ((activeConversation?.sessionId ?? '').isNotEmpty)
+                  Text(
+                    activeConversation!.sessionId,
+                    style: theme.textTheme.labelSmall,
+                  ),
+              ],
+            ),
             actions: [
+              IconButton(
+                onPressed: () async {
+                  await widget.chatController.createConversation();
+                  if (!mounted) {
+                    return;
+                  }
+                  composerController.clear();
+                  setState(pendingAttachments.clear);
+                },
+                icon: const Icon(Icons.add_comment_outlined),
+                tooltip: 'New chat',
+              ),
               StatusBadge(label: widget.connectionController.phase),
               const SizedBox(width: 6),
               IconButton(
@@ -256,6 +288,35 @@ class _ChatScreenState extends State<ChatScreen> {
           chatController: widget.chatController,
         ),
       ),
+    );
+  }
+
+  void _openConversationList() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return ConversationListSheet(
+          conversations: widget.chatController.conversationSummaries,
+          activeConversationId: widget.chatController.activeConversationSummary?.id,
+          onCreateConversation: () async {
+            await widget.chatController.createConversation();
+            if (!mounted) {
+              return;
+            }
+            composerController.clear();
+            setState(pendingAttachments.clear);
+          },
+          onSelectConversation: (conversationId) async {
+            await widget.chatController.switchConversation(conversationId);
+            if (!mounted) {
+              return;
+            }
+            composerController.clear();
+            setState(pendingAttachments.clear);
+          },
+        );
+      },
     );
   }
 

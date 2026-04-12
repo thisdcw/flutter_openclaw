@@ -2,9 +2,13 @@ import 'package:flutter/foundation.dart';
 
 import '../models/app_error_notice.dart';
 import 'app_error_controller.dart';
+import '../../domain/models/chat_conversation_record.dart';
+import '../../domain/models/chat_conversation_summary.dart';
 import '../../domain/models/chat_draft.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/gateway_config.dart';
+import '../../domain/models/chat_store_snapshot.dart';
+import '../../domain/repositories/chat_conversation_store.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../../infrastructure/util/openclaw_logger.dart';
 import '../use_cases/send_chat_message_use_case.dart';
@@ -14,14 +18,22 @@ class ChatController extends ChangeNotifier {
     ChatRepository? chatRepository,
     SendChatMessageUseCase? sendChatMessageUseCase,
     GatewayConfig Function()? configProvider,
-    String Function()? sessionIdProvider,
+    ChatConversationStore? conversationStore,
+    ChatStoreSnapshot? initialSnapshot,
     AppErrorController? appErrorController,
+    Future<void> Function(String sessionId)? activeSessionSync,
     bool isStub = false,
   })  : _chatRepository = chatRepository,
         _sendChatMessageUseCase = sendChatMessageUseCase,
         _configProvider = configProvider,
-        _sessionIdProvider = sessionIdProvider,
+        _conversationStore = conversationStore,
+        _conversationSummaries =
+            List<ChatConversationSummary>.from(
+              initialSnapshot?.conversationSummaries ?? const <ChatConversationSummary>[],
+            ),
+        _activeConversation = initialSnapshot?.activeConversation,
         _appErrorController = appErrorController,
+        _activeSessionSync = activeSessionSync,
         _isStub = isStub;
 
   factory ChatController.fake() => ChatController(isStub: true);
@@ -29,10 +41,12 @@ class ChatController extends ChangeNotifier {
   final ChatRepository? _chatRepository;
   final SendChatMessageUseCase? _sendChatMessageUseCase;
   final GatewayConfig Function()? _configProvider;
-  final String Function()? _sessionIdProvider;
+  final ChatConversationStore? _conversationStore;
   final AppErrorController? _appErrorController;
+  final Future<void> Function(String sessionId)? _activeSessionSync;
   final bool _isStub;
-  final List<ChatMessage> _messages = <ChatMessage>[];
+  final List<ChatConversationSummary> _conversationSummaries;
+  ChatConversationRecord? _activeConversation;
 
   bool isSending = false;
   String? errorMessage;
@@ -40,7 +54,52 @@ class ChatController extends ChangeNotifier {
 
   bool get isStub => _isStub;
 
-  List<ChatMessage> get messages => List<ChatMessage>.unmodifiable(_messages);
+  List<ChatConversationSummary> get conversationSummaries =>
+      List<ChatConversationSummary>.unmodifiable(_conversationSummaries);
+
+  ChatConversationSummary? get activeConversationSummary => _activeConversation?.summary;
+
+  String get activeSessionId => _activeConversation?.summary.sessionId ?? '';
+
+  List<ChatMessage> get messages => List<ChatMessage>.unmodifiable(
+        _activeConversation?.messages ?? const <ChatMessage>[],
+      );
+
+  Future<void> createConversation() async {
+    final store = _conversationStore;
+    if (_isStub || store == null) {
+      _replaceActiveConversation(
+        ChatStoreSnapshot(
+          activeConversation: ChatConversationRecord(
+            summary: ChatConversationSummary(
+              id: 'stub-conversation',
+              sessionId: 'stub-session',
+              title: 'New chat',
+              previewText: '',
+              updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+              messageCount: 0,
+            ),
+            messages: const <ChatMessage>[],
+          ),
+          conversationSummaries: const <ChatConversationSummary>[],
+        ),
+      );
+      return;
+    }
+    final snapshot = await store.createConversation();
+    _replaceActiveConversation(snapshot);
+    await _syncActiveSession();
+  }
+
+  Future<void> switchConversation(String conversationId) async {
+    final store = _conversationStore;
+    if (store == null || _activeConversation?.summary.id == conversationId) {
+      return;
+    }
+    final snapshot = await store.activateConversation(conversationId);
+    _replaceActiveConversation(snapshot);
+    await _syncActiveSession();
+  }
 
   Future<void> send(ChatDraft draft) async {
     if (!draft.hasSendableContent) {
@@ -49,7 +108,8 @@ class ChatController extends ChangeNotifier {
     }
 
     final normalized = draft.normalizedText;
-    final shouldClearLocalHistory = _shouldClearLocalHistory(normalized);
+    final shouldCreateFreshConversation =
+        _shouldCreateFreshConversation(normalized);
     openClawLog(
       'ChatController',
       'send begin',
@@ -57,41 +117,42 @@ class ChatController extends ChangeNotifier {
         'messageLength': normalized.length,
         'attachmentCount': draft.attachments.length,
         'preview': truncateForLog(normalized, maxLength: 80),
-        'clearLocalHistory': shouldClearLocalHistory,
+        'createFreshConversation': shouldCreateFreshConversation,
       },
     );
+
+    if (shouldCreateFreshConversation) {
+      await createConversation();
+      return;
+    }
 
     isSending = true;
     errorMessage = null;
     errorNotice = null;
-    if (shouldClearLocalHistory) {
-      _messages.clear();
-    }
-    _messages.add(
+    _upsertLocalMessage(
       ChatMessage(
-        id: 'user-${_messages.length}',
+        id: 'user-${DateTime.now().microsecondsSinceEpoch}',
         role: MessageRole.user,
         text: normalized,
         attachments: draft.attachments,
       ),
     );
+    await _persistActiveConversation();
     notifyListeners();
 
     final repository = _chatRepository;
     final sendChatMessageUseCase = _sendChatMessageUseCase;
     final configProvider = _configProvider;
-    final sessionIdProvider = _sessionIdProvider;
     final hasUseCase = sendChatMessageUseCase != null && configProvider != null;
-    final hasRepository = repository != null;
-    final canUseRepository = hasRepository && sessionIdProvider != null;
-    if (!hasUseCase && !canUseRepository) {
+    final hasRepository = repository != null && activeSessionId.isNotEmpty;
+    if (!hasUseCase && !hasRepository) {
       openClawLog(
         'ChatController',
         'send skipped: missing send pathway',
         fields: <String, Object?>{
           'hasUseCase': hasUseCase,
           'hasRepository': hasRepository,
-          'hasSessionIdProvider': sessionIdProvider != null,
+          'activeSessionId': activeSessionId,
         },
       );
       isSending = false;
@@ -104,14 +165,16 @@ class ChatController extends ChangeNotifier {
     try {
       errorMessage = null;
       errorNotice = null;
+      final sessionId = activeSessionId;
       final stream = hasUseCase
           ? sendChatMessageUseCase.call(
               draft,
               config: configProvider(),
+              sessionId: sessionId,
             )
           : repository!.sendMessage(
               draft,
-              sessionId: sessionIdProvider!(),
+              sessionId: sessionId,
             );
 
       await for (final message in stream) {
@@ -126,15 +189,12 @@ class ChatController extends ChangeNotifier {
           },
         );
         _upsertAssistantMessage(message);
+        await _persistActiveConversation();
       }
     } catch (error) {
       final rawReason = error.toString();
-      _messages.removeWhere(
-        (message) =>
-            message.role == MessageRole.assistant &&
-            message.isStreaming &&
-            message.text.isEmpty,
-      );
+      _removeEmptyStreamingAssistantMessage();
+      await _persistActiveConversation();
       errorMessage = rawReason;
       errorNotice = AppErrorNotice.fromRaw(
         id: _nextErrorId(),
@@ -165,14 +225,42 @@ class ChatController extends ChangeNotifier {
     }
   }
 
+  void _upsertLocalMessage(ChatMessage message) {
+    final active = _requireActiveConversation();
+    final nextMessages = <ChatMessage>[
+      ...active.messages,
+      message,
+    ];
+    _activeConversation = active.copyWith(messages: nextMessages);
+  }
+
   void _upsertAssistantMessage(ChatMessage message) {
-    final index = _messages.indexWhere((entry) => entry.id == message.id);
+    final active = _requireActiveConversation();
+    final nextMessages = List<ChatMessage>.from(active.messages);
+    final index = nextMessages.indexWhere((entry) => entry.id == message.id);
     if (index == -1) {
-      _messages.add(message);
+      nextMessages.add(message);
     } else {
-      _messages[index] = message;
+      nextMessages[index] = message;
     }
+    _activeConversation = active.copyWith(messages: nextMessages);
     notifyListeners();
+  }
+
+  void _removeEmptyStreamingAssistantMessage() {
+    final active = _activeConversation;
+    if (active == null) {
+      return;
+    }
+    final nextMessages = active.messages
+        .where(
+          (message) =>
+              !(message.role == MessageRole.assistant &&
+                  message.isStreaming &&
+                  message.text.isEmpty),
+        )
+        .toList(growable: false);
+    _activeConversation = active.copyWith(messages: nextMessages);
   }
 
   void showInlineError({
@@ -200,8 +288,98 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  static bool _shouldClearLocalHistory(String normalizedText) {
-    return normalizedText == '/new';
+  Future<void> _persistActiveConversation() async {
+    final store = _conversationStore;
+    final active = _activeConversation;
+    if (store == null || active == null) {
+      return;
+    }
+    final nextSummary = _summarize(
+      active.summary,
+      active.messages,
+    );
+    final nextRecord = active.copyWith(summary: nextSummary);
+    _activeConversation = nextRecord;
+    _replaceSummary(nextSummary);
+    await store.saveConversation(nextRecord);
+  }
+
+  void _replaceActiveConversation(ChatStoreSnapshot snapshot) {
+    _activeConversation = snapshot.activeConversation;
+    _conversationSummaries
+      ..clear()
+      ..addAll(snapshot.conversationSummaries);
+    _replaceSummary(snapshot.activeConversation.summary);
+    notifyListeners();
+  }
+
+  void _replaceSummary(ChatConversationSummary summary) {
+    _conversationSummaries.removeWhere((item) => item.id == summary.id);
+    _conversationSummaries.insert(0, summary);
+    _conversationSummaries.sort(
+      (left, right) => right.updatedAtMs.compareTo(left.updatedAtMs),
+    );
+  }
+
+  ChatConversationSummary _summarize(
+    ChatConversationSummary base,
+    List<ChatMessage> messages,
+  ) {
+    final firstUserText = messages
+        .where((message) => message.role == MessageRole.user)
+        .map((message) => message.text.trim())
+        .firstWhere((text) => text.isNotEmpty, orElse: () => '');
+    final preview = messages.reversed
+        .map((message) => message.text.trim())
+        .firstWhere((text) => text.isNotEmpty, orElse: () => '');
+    return base.copyWith(
+      title: firstUserText.isEmpty
+          ? 'New chat'
+          : _truncate(firstUserText, maxLength: 32),
+      previewText: preview.isEmpty ? '' : _truncate(preview, maxLength: 60),
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+      messageCount: messages.length,
+    );
+  }
+
+  Future<void> _syncActiveSession() async {
+    final sessionId = activeSessionId;
+    if (sessionId.isEmpty) {
+      return;
+    }
+    await _activeSessionSync?.call(sessionId);
+  }
+
+  ChatConversationRecord _requireActiveConversation() {
+    final active = _activeConversation;
+    if (active != null) {
+      return active;
+    }
+    final fallback = ChatConversationRecord(
+      summary: ChatConversationSummary(
+        id: 'fallback',
+        sessionId: 'fallback',
+        title: 'New chat',
+        previewText: '',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+        messageCount: 0,
+      ),
+      messages: const <ChatMessage>[],
+    );
+    _activeConversation = fallback;
+    return fallback;
+  }
+
+  static bool _shouldCreateFreshConversation(String normalizedText) {
+    return normalizedText == '/new' || normalizedText == '/reset';
+  }
+
+  static String _truncate(String value, {required int maxLength}) {
+    final normalized = value.replaceAll('\n', ' ').trim();
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+    return '${normalized.substring(0, maxLength - 1)}…';
   }
 
   String _nextErrorId() {

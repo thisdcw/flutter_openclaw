@@ -9,31 +9,32 @@ import 'src/app/app_dependencies.dart';
 import 'src/app/openclaw_app.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
   final appErrorController = AppErrorController();
-
-  FlutterError.onError = (details) {
-    FlutterError.presentError(details);
-    appErrorController.reportUnexpected(
-      details.exception,
-      details.stack ?? StackTrace.current,
-      scope: AppErrorScope.system,
-      code: 'FLUTTER_ERROR',
-    );
-  };
-
-  PlatformDispatcher.instance.onError = (error, stackTrace) {
-    appErrorController.reportUnexpected(
-      error,
-      stackTrace,
-      scope: AppErrorScope.system,
-      code: 'PLATFORM_ERROR',
-    );
-    return true;
-  };
 
   await runZonedGuarded(
     () async {
+      WidgetsFlutterBinding.ensureInitialized();
+
+      FlutterError.onError = (details) {
+        FlutterError.presentError(details);
+        appErrorController.reportUnexpected(
+          details.exception,
+          details.stack ?? StackTrace.current,
+          scope: AppErrorScope.system,
+          code: 'FLUTTER_ERROR',
+        );
+      };
+
+      PlatformDispatcher.instance.onError = (error, stackTrace) {
+        appErrorController.reportUnexpected(
+          error,
+          stackTrace,
+          scope: AppErrorScope.system,
+          code: 'PLATFORM_ERROR',
+        );
+        return true;
+      };
+
       final dependencies = await AppDependencies.create(
         appErrorController: appErrorController,
       );

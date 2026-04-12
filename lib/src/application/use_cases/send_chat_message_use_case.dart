@@ -19,6 +19,7 @@ class SendChatMessageUseCase {
   Stream<ChatMessage> call(
     ChatDraft draft, {
     required GatewayConfig config,
+    required String sessionId,
   }) async* {
     final normalizedText = draft.normalizedText;
     openClawLog(
@@ -26,7 +27,7 @@ class SendChatMessageUseCase {
       'send flow start',
       fields: <String, Object?>{
         'gatewayUrl': config.gatewayUrl,
-        'sessionId': config.sessionId,
+        'sessionId': sessionId,
         'textLength': normalizedText.length,
         'attachmentCount': draft.attachments.length,
         'preview': truncateForLog(normalizedText, maxLength: 80),
@@ -48,7 +49,7 @@ class SendChatMessageUseCase {
         parser: _parser,
         timeout: Duration(milliseconds: config.timeoutMs),
       );
-      yield* repository.sendMessage(draft, sessionId: config.sessionId);
+      yield* repository.sendMessage(draft, sessionId: sessionId);
     } finally {
       openClawLog('SendChatMessage', 'dispose authenticated session');
       await session.dispose();

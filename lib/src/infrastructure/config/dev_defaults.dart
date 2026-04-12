@@ -9,7 +9,7 @@ const List<String> defaultOperatorScopes = <String>[
 const GatewayConfig defaultGatewayConfig = GatewayConfig(
   gatewayUrl: 'wss://thisdcw.cn/claw',
   authToken: 'ff158cd1f6c32f4ac8d56d7315802af2e3e94c50bd9f9939',
-  sessionId: 'cli-session-default',
+  sessionId: '',
   timeoutMs: 60000,
   locale: 'zh-CN',
 );

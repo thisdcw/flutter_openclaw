@@ -13,6 +13,7 @@ import 'package:flutter_openclaw/src/domain/models/connection_status.dart';
 import 'package:flutter_openclaw/src/infrastructure/crypto/connect_signer.dart';
 import 'package:flutter_openclaw/src/infrastructure/crypto/device_identity_service.dart';
 import 'package:flutter_openclaw/src/infrastructure/gateway/gateway_protocol_parser.dart';
+import 'package:flutter_openclaw/src/infrastructure/storage/chat_conversation_store_factory.dart';
 import 'package:flutter_openclaw/src/infrastructure/storage/shared_prefs_app_locale_preference_repository.dart';
 import 'package:flutter_openclaw/src/infrastructure/storage/secure_auth_repository.dart';
 import 'package:flutter_openclaw/src/infrastructure/storage/shared_prefs_config_repository.dart';
@@ -39,6 +40,10 @@ class AppDependencies {
     final configRepository = SharedPrefsConfigRepository(prefs);
     final appLocalePreferenceRepository =
         SharedPrefsAppLocalePreferenceRepository(prefs);
+    final chatConversationStore = await createChatConversationStore(
+      prefs: prefs,
+    );
+    final chatStoreSnapshot = await chatConversationStore.bootstrap();
     final authRepository = SecureAuthRepository();
     final parser = const GatewayProtocolParser();
     final signer = const ConnectSigner();
@@ -49,6 +54,9 @@ class AppDependencies {
       identityService,
     );
     final bootstrapResult = await bootstrap.call();
+    final initialConfig = bootstrapResult.config.copyWith(
+      sessionId: chatStoreSnapshot.activeConversation.summary.sessionId,
+    );
     final initialLocalePreference = await appLocalePreferenceRepository.load();
     final clearOperatorAuthUseCase = ClearOperatorAuthUseCase(authRepository);
     final resetDeviceIdentityUseCase = ResetDeviceIdentityUseCase(authRepository);
@@ -63,7 +71,7 @@ class AppDependencies {
       parser: parser,
     );
     final settingsController = SettingsController(
-      initialConfig: bootstrapResult.config,
+      initialConfig: initialConfig,
       initialLocalePreference: initialLocalePreference,
       configRepository: configRepository,
       appLocalePreferenceRepository: appLocalePreferenceRepository,
@@ -84,8 +92,10 @@ class AppDependencies {
     final chatController = ChatController(
       sendChatMessageUseCase: sendChatMessageUseCase,
       configProvider: () => settingsController.config,
-      sessionIdProvider: () => settingsController.config.sessionId,
+      conversationStore: chatConversationStore,
+      initialSnapshot: chatStoreSnapshot,
       appErrorController: resolvedAppErrorController,
+      activeSessionSync: settingsController.syncActiveSessionId,
     );
 
     return AppDependencies(

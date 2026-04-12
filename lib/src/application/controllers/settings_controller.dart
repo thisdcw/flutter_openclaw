@@ -102,4 +102,14 @@ class SettingsController extends ChangeNotifier {
     await _clearOperatorAuthUseCase?.call();
     notifyListeners();
   }
+
+  Future<void> syncActiveSessionId(String sessionId) async {
+    if (_config.sessionId == sessionId) {
+      return;
+    }
+    final next = _config.copyWith(sessionId: sessionId);
+    _config = next;
+    await _configRepository?.save(next);
+    notifyListeners();
+  }
 }

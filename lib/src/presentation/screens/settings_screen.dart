@@ -40,6 +40,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final l10n = AppLocalizations.of(context)!;
     final connectionController = widget.connectionController;
     final config = widget.settingsController.config;
+    final activeSessionId =
+        widget.chatController.activeConversationSummary?.sessionId ??
+            config.sessionId;
     final deviceId = connectionController.status.deviceId ?? l10n.pendingDeviceLabel;
 
     return Scaffold(
@@ -142,7 +145,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 18),
                       _ReadonlySettingRow(
                         label: l10n.sessionIdLabel,
-                        value: config.sessionId,
+                        value: activeSessionId,
                       ),
                       const SizedBox(height: 14),
                       _ReadonlySettingRow(
