@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:collection/collection.dart';
 
 import 'chat_input_part.dart';
@@ -16,6 +18,28 @@ class ChatDraft {
 
   bool get hasSendableContent =>
       normalizedText.isNotEmpty || attachments.isNotEmpty;
+
+  String toGatewayMessage() {
+    if (attachments.isEmpty) {
+      return normalizedText;
+    }
+
+    return jsonEncode(
+      <String, Object?>{
+        'type': 'input_text_with_images',
+        'text': normalizedText,
+        'images': attachments
+            .map(
+              (attachment) => <String, Object?>{
+                'fileName': attachment.fileName,
+                'mimeType': attachment.mimeType,
+                'data': base64.encode(attachment.bytes),
+              },
+            )
+            .toList(growable: false),
+      },
+    );
+  }
 
   List<ChatInputPart> toGatewayContent() {
     final parts = <ChatInputPart>[];

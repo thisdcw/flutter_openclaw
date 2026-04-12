@@ -43,7 +43,7 @@ class LiveChatRepository implements ChatRepository {
     final assistantMessageId = 'assistant-$requestId';
     final request = _tracker.create(requestId: requestId);
     final normalizedText = draft.normalizedText;
-    final contentParts = draft.toGatewayContent();
+    final gatewayMessage = draft.toGatewayMessage();
     openClawLog(
       'ChatRepository',
       'create chat request',
@@ -52,11 +52,12 @@ class LiveChatRepository implements ChatRepository {
         'sessionId': sessionId,
         'textLength': normalizedText.length,
         'attachmentCount': draft.attachments.length,
-        'contentParts': contentParts.length,
+        'messageLength': gatewayMessage.length,
         'textPreview': truncateForLog(normalizedText, maxLength: 80),
         'timeoutMs': _timeout.inMilliseconds,
       },
     );
+
     Timer? timeoutTimer;
     StreamSubscription<GatewayFrame>? subscription;
 
@@ -193,7 +194,7 @@ class LiveChatRepository implements ChatRepository {
         'method': 'chat.send',
         'params': <String, Object?>{
           'sessionKey': sessionId,
-          'content': contentParts.map((part) => part.toJson()).toList(),
+          'message': gatewayMessage,
           'idempotencyKey': _uuid.v4(),
         },
       },
