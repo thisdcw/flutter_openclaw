@@ -44,6 +44,7 @@ class LiveChatRepository implements ChatRepository {
     final request = _tracker.create(requestId: requestId);
     final normalizedText = draft.normalizedText;
     final gatewayMessage = draft.toGatewayMessage();
+    final gatewayAttachments = draft.toGatewayAttachments();
     openClawLog(
       'ChatRepository',
       'create chat request',
@@ -195,7 +196,12 @@ class LiveChatRepository implements ChatRepository {
         'params': <String, Object?>{
           'sessionKey': sessionId,
           'message': gatewayMessage,
+          'deliver': false,
           'idempotencyKey': _uuid.v4(),
+          if (gatewayAttachments.isNotEmpty)
+            'attachments': gatewayAttachments
+                .map((attachment) => attachment.toJson())
+                .toList(growable: false),
         },
       },
     );

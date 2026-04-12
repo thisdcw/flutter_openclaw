@@ -2,8 +2,49 @@ import 'dart:convert';
 
 import 'package:collection/collection.dart';
 
-import 'chat_input_part.dart';
 import 'selected_image_attachment.dart';
+
+class GatewayChatAttachment {
+  const GatewayChatAttachment({
+    required this.type,
+    required this.mimeType,
+    required this.content,
+  });
+
+  final String type;
+  final String mimeType;
+  final String content;
+
+  factory GatewayChatAttachment.fromSelectedImage(
+    SelectedImageAttachment attachment,
+  ) {
+    return GatewayChatAttachment(
+      type: 'image',
+      mimeType: attachment.mimeType,
+      content: base64.encode(attachment.bytes),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'type': type,
+      'mimeType': mimeType,
+      'content': content,
+    };
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is GatewayChatAttachment &&
+        other.type == type &&
+        other.mimeType == mimeType &&
+        other.content == content;
+  }
+
+  @override
+  int get hashCode => Object.hash(type, mimeType, content);
+}
 
 class ChatDraft {
   ChatDraft({
@@ -19,38 +60,11 @@ class ChatDraft {
   bool get hasSendableContent =>
       normalizedText.isNotEmpty || attachments.isNotEmpty;
 
-  String toGatewayMessage() {
-    if (attachments.isEmpty) {
-      return normalizedText;
-    }
+  String toGatewayMessage() => normalizedText;
 
-    return jsonEncode(
-      <String, Object?>{
-        'type': 'input_text_with_images',
-        'text': normalizedText,
-        'images': attachments
-            .map(
-              (attachment) => <String, Object?>{
-                'fileName': attachment.fileName,
-                'mimeType': attachment.mimeType,
-                'data': base64.encode(attachment.bytes),
-              },
-            )
-            .toList(growable: false),
-      },
-    );
-  }
-
-  List<ChatInputPart> toGatewayContent() {
-    final parts = <ChatInputPart>[];
-    if (normalizedText.isNotEmpty) {
-      parts.add(ChatInputTextPart(normalizedText));
-    }
-    for (final attachment in attachments) {
-      parts.add(ChatInputImagePart.fromAttachment(attachment));
-    }
-    return parts;
-  }
+  List<GatewayChatAttachment> toGatewayAttachments() => attachments
+      .map(GatewayChatAttachment.fromSelectedImage)
+      .toList(growable: false);
 
   @override
   bool operator ==(Object other) {
