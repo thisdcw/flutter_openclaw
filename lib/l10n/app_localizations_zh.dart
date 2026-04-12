@@ -9,10 +9,10 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get appTitle => 'OpenClaw';
+  String get appTitle => 'Cici';
 
   @override
-  String get chatScreenTitle => 'OpenClaw 对话';
+  String get chatScreenTitle => 'Cici';
 
   @override
   String get settingsTitle => '设置';
@@ -121,7 +121,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get addImagesTooltip => '添加图片';
 
   @override
-  String get messageHint => '向 OpenClaw 发送消息';
+  String get messageHint => '向 Cici 发送消息';
 
   @override
   String get composerModeHint => '输入消息或以 / 开头使用命令。';

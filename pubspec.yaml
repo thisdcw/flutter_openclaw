@@ -1,5 +1,5 @@
 name: flutter_openclaw
-description: "A new Flutter project."
+description: "OpenClaw cross-platform client app."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -54,6 +54,24 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  image_path: assets/branding/app_icon_master.png
+  adaptive_icon_foreground: assets/branding/app_icon_android_foreground.png
+  adaptive_icon_monochrome: assets/branding/app_icon_android_monochrome.png
+  adaptive_icon_background: "#0E1B2D"
+  android: true
+  ios: true
+  web:
+    generate: true
+    background_color: "#0E1B2D"
+    theme_color: "#0E1B2D"
+  macos:
+    generate: true
+  windows:
+    generate: true
+  remove_alpha_ios: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

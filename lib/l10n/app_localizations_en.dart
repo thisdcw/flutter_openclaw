@@ -9,10 +9,10 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'OpenClaw';
+  String get appTitle => 'Cici';
 
   @override
-  String get chatScreenTitle => 'OpenClaw Chat';
+  String get chatScreenTitle => 'Cici';
 
   @override
   String get settingsTitle => 'Settings';
@@ -126,7 +126,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addImagesTooltip => 'Add images';
 
   @override
-  String get messageHint => 'Message OpenClaw';
+  String get messageHint => 'Message Cici';
 
   @override
   String get composerModeHint =>

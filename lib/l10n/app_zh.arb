@@ -1,7 +1,7 @@
 {
   "@@locale": "zh",
-  "appTitle": "OpenClaw",
-  "chatScreenTitle": "OpenClaw 对话",
+  "appTitle": "Cici",
+  "chatScreenTitle": "Cici",
   "settingsTitle": "设置",
   "settingsCloseTooltip": "关闭设置",
   "settingsOpenTooltip": "打开设置",
@@ -41,7 +41,7 @@
     }
   },
   "addImagesTooltip": "添加图片",
-  "messageHint": "向 OpenClaw 发送消息",
+  "messageHint": "向 Cici 发送消息",
   "composerModeHint": "输入消息或以 / 开头使用命令。",
   "sendLabel": "发送",
   "sendingLabel": "发送中…",

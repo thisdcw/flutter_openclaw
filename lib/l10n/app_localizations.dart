@@ -101,13 +101,13 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'OpenClaw'**
+  /// **'Cici'**
   String get appTitle;
 
   /// No description provided for @chatScreenTitle.
   ///
   /// In en, this message translates to:
-  /// **'OpenClaw Chat'**
+  /// **'Cici'**
   String get chatScreenTitle;
 
   /// No description provided for @settingsTitle.
@@ -317,7 +317,7 @@ abstract class AppLocalizations {
   /// No description provided for @messageHint.
   ///
   /// In en, this message translates to:
-  /// **'Message OpenClaw'**
+  /// **'Message Cici'**
   String get messageHint;
 
   /// No description provided for @composerModeHint.

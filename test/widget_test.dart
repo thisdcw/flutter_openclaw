@@ -11,7 +11,7 @@ void main() {
   testWidgets('chat screen is the home view', (WidgetTester tester) async {
     await tester.pumpWidget(OpenClawApp(dependencies: AppDependencies.fake()));
 
-    expect(find.text('OpenClaw Chat'), findsOneWidget);
+    expect(find.text('Cici'), findsOneWidget);
   });
 
   testWidgets('failed connection shows strip and Connection button',
