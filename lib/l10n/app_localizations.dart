@@ -272,6 +272,12 @@ abstract class AppLocalizations {
   /// **'Your assistant replies will stream here as soon as the connection is ready and operator.write is available.'**
   String get chatEmptySubtitle;
 
+  /// No description provided for @chatCommandDiscoveryPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Try `/new`, `/status`, `/model`, `/think`, or `/help` to see how commands behave.'**
+  String get chatCommandDiscoveryPrompt;
+
   /// No description provided for @connectionButtonLabel.
   ///
   /// In en, this message translates to:
@@ -313,6 +319,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Message OpenClaw'**
   String get messageHint;
+
+  /// No description provided for @composerModeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type a message or start with / to run a command.'**
+  String get composerModeHint;
 
   /// No description provided for @sendLabel.
   ///
@@ -451,6 +463,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed'**
   String get phaseFailed;
+
+  /// No description provided for @commandGroupSessionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Session commands'**
+  String get commandGroupSessionLabel;
+
+  /// No description provided for @commandGroupStatusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Status & help'**
+  String get commandGroupStatusLabel;
+
+  /// No description provided for @commandGroupSettingsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model & settings'**
+  String get commandGroupSettingsLabel;
+
+  /// No description provided for @commandDescriptionNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a new session'**
+  String get commandDescriptionNew;
+
+  /// No description provided for @commandDescriptionStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Check current session health'**
+  String get commandDescriptionStatus;
+
+  /// No description provided for @commandDescriptionModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Inspect or switch models'**
+  String get commandDescriptionModel;
+
+  /// No description provided for @commandDescriptionThink.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust the model\'s thinking depth'**
+  String get commandDescriptionThink;
+
+  /// No description provided for @commandDescriptionHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'See available help topics'**
+  String get commandDescriptionHelp;
+
+  /// No description provided for @commandDescriptionReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Alias of /new'**
+  String get commandDescriptionReset;
+
+  /// No description provided for @commandDescriptionCompact.
+  ///
+  /// In en, this message translates to:
+  /// **'Condense the current context'**
+  String get commandDescriptionCompact;
+
+  /// No description provided for @commandDescriptionStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop the current response'**
+  String get commandDescriptionStop;
+
+  /// No description provided for @commandDescriptionFast.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle faster response mode'**
+  String get commandDescriptionFast;
+
+  /// No description provided for @semanticHintGatewayStandalone.
+  ///
+  /// In en, this message translates to:
+  /// **'This will be sent as a Gateway command.'**
+  String get semanticHintGatewayStandalone;
+
+  /// No description provided for @semanticHintInlineDirective.
+  ///
+  /// In en, this message translates to:
+  /// **'This inline directive applies only to this message.'**
+  String get semanticHintInlineDirective;
+
+  /// No description provided for @semanticHintStandaloneRecommended.
+  ///
+  /// In en, this message translates to:
+  /// **'This command is usually sent on its own.'**
+  String get semanticHintStandaloneRecommended;
+
+  /// No description provided for @semanticHintLocalClear.
+  ///
+  /// In en, this message translates to:
+  /// **'`/clear` is a local app command.'**
+  String get semanticHintLocalClear;
 }
 
 class _AppLocalizationsDelegate

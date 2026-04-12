@@ -97,6 +97,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatEmptySubtitle => '连接就绪并且具备 operator.write 权限后，助手回复会显示在这里。';
 
   @override
+  String get chatCommandDiscoveryPrompt =>
+      '试试 `/new`、`/status`、`/model`、`/think` 或 `/help` 来了解命令。';
+
+  @override
   String get connectionButtonLabel => '连接';
 
   @override
@@ -118,6 +122,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get messageHint => '向 OpenClaw 发送消息';
+
+  @override
+  String get composerModeHint => '输入消息或以 / 开头使用命令。';
 
   @override
   String get sendLabel => '发送';
@@ -190,4 +197,52 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get phaseFailed => '失败';
+
+  @override
+  String get commandGroupSessionLabel => '会话命令';
+
+  @override
+  String get commandGroupStatusLabel => '状态与帮助';
+
+  @override
+  String get commandGroupSettingsLabel => '模型与设置';
+
+  @override
+  String get commandDescriptionNew => '开启一个新会话';
+
+  @override
+  String get commandDescriptionStatus => '查看当前会话状态';
+
+  @override
+  String get commandDescriptionModel => '查看或切换模型';
+
+  @override
+  String get commandDescriptionThink => '调整模型的思考深度';
+
+  @override
+  String get commandDescriptionHelp => '查看可用帮助';
+
+  @override
+  String get commandDescriptionReset => '等同于 /new';
+
+  @override
+  String get commandDescriptionCompact => '压缩当前上下文';
+
+  @override
+  String get commandDescriptionStop => '停止当前回复';
+
+  @override
+  String get commandDescriptionFast => '切换快速响应模式';
+
+  @override
+  String get semanticHintGatewayStandalone => '这会作为 Gateway 命令发送。';
+
+  @override
+  String get semanticHintInlineDirective => '检测到的内联指令仅影响当前消息。';
+
+  @override
+  String get semanticHintStandaloneRecommended => '该命令通常单独发送。';
+
+  @override
+  String get semanticHintLocalClear => '`/clear` 是本地客户端命令。';
 }

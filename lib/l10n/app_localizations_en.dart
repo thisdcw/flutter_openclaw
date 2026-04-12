@@ -101,6 +101,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your assistant replies will stream here as soon as the connection is ready and operator.write is available.';
 
   @override
+  String get chatCommandDiscoveryPrompt =>
+      'Try `/new`, `/status`, `/model`, `/think`, or `/help` to see how commands behave.';
+
+  @override
   String get connectionButtonLabel => 'Connection';
 
   @override
@@ -123,6 +127,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get messageHint => 'Message OpenClaw';
+
+  @override
+  String get composerModeHint =>
+      'Type a message or start with / to run a command.';
 
   @override
   String get sendLabel => 'Send';
@@ -202,4 +210,55 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get phaseFailed => 'Failed';
+
+  @override
+  String get commandGroupSessionLabel => 'Session commands';
+
+  @override
+  String get commandGroupStatusLabel => 'Status & help';
+
+  @override
+  String get commandGroupSettingsLabel => 'Model & settings';
+
+  @override
+  String get commandDescriptionNew => 'Start a new session';
+
+  @override
+  String get commandDescriptionStatus => 'Check current session health';
+
+  @override
+  String get commandDescriptionModel => 'Inspect or switch models';
+
+  @override
+  String get commandDescriptionThink => 'Adjust the model\'s thinking depth';
+
+  @override
+  String get commandDescriptionHelp => 'See available help topics';
+
+  @override
+  String get commandDescriptionReset => 'Alias of /new';
+
+  @override
+  String get commandDescriptionCompact => 'Condense the current context';
+
+  @override
+  String get commandDescriptionStop => 'Stop the current response';
+
+  @override
+  String get commandDescriptionFast => 'Toggle faster response mode';
+
+  @override
+  String get semanticHintGatewayStandalone =>
+      'This will be sent as a Gateway command.';
+
+  @override
+  String get semanticHintInlineDirective =>
+      'This inline directive applies only to this message.';
+
+  @override
+  String get semanticHintStandaloneRecommended =>
+      'This command is usually sent on its own.';
+
+  @override
+  String get semanticHintLocalClear => '`/clear` is a local app command.';
 }

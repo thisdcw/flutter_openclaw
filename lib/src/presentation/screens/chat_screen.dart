@@ -14,6 +14,7 @@ import '../../domain/models/connection_status.dart';
 import '../../domain/models/selected_image_attachment.dart';
 import '../../infrastructure/util/openclaw_logger.dart';
 import '../localization/localized_gateway_text.dart';
+import '../widgets/chat_command_assist.dart';
 import '../widgets/chat_composer.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/status_badge.dart';
@@ -37,6 +38,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   late final TextEditingController composerController;
+  late final FocusNode composerFocusNode;
   late final ImagePicker imagePicker;
   final List<SelectedImageAttachment> pendingAttachments = [];
   final Uuid uuid = Uuid();
@@ -46,6 +48,7 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     composerController = TextEditingController();
     composerController.addListener(_handleComposerChange);
+    composerFocusNode = FocusNode();
     imagePicker = ImagePicker();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(widget.connectionController.connectIfNeeded());
@@ -56,6 +59,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     composerController.removeListener(_handleComposerChange);
     composerController.dispose();
+    composerFocusNode.dispose();
     super.dispose();
   }
 
@@ -78,6 +82,11 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         final localizedFailureMessage = _localizedChatError(l10n);
         final messages = widget.chatController.messages;
+        final trimmedDraft = composerController.text.trimLeft();
+        final commandHint = analyzeChatDraft(composerController.text).hintKind;
+        final commandSuggestions = trimmedDraft.startsWith('/')
+            ? filterSlashSuggestions(composerController.text)
+            : const <ChatCommandSuggestion>[];
         final hasDraftContent = composerController.text.trim().isNotEmpty ||
             pendingAttachments.isNotEmpty;
         final connectionTitle = _connectionTitle(
@@ -165,7 +174,11 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                         child: messages.isEmpty
-                            ? _ChatEmptyState(l10n: l10n)
+                            ? _ChatEmptyState(
+                                l10n: l10n,
+                                discoveryCommands: discoveryCommands,
+                                onSelectCommand: _applyCommandTemplate,
+                              )
                             : ListView.separated(
                                 padding: EdgeInsets.zero,
                                 itemCount: messages.length,
@@ -180,10 +193,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     const SizedBox(height: 8),
                     ChatComposer(
                       controller: composerController,
+                      focusNode: composerFocusNode,
                       enabled: widget.connectionController.canSend,
                       hasContent: hasDraftContent,
                       isSending: widget.chatController.isSending,
                       attachments: pendingAttachments,
+                      commandSuggestions: commandSuggestions,
+                      commandHintKind: commandHint,
+                      onSelectCommandSuggestion: _applyCommandTemplate,
                       onPickImages: _pickImages,
                       onRemoveAttachment: _removeAttachment,
                       onSend: () async {
@@ -244,6 +261,15 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted) {
       return;
     }
+    setState(() {});
+  }
+
+  void _applyCommandTemplate(String template) {
+    composerController.value = TextEditingValue(
+      text: template,
+      selection: TextSelection.collapsed(offset: template.length),
+    );
+    composerFocusNode.requestFocus();
     setState(() {});
   }
 
@@ -421,13 +447,20 @@ class _ChatBanner extends StatelessWidget {
 }
 
 class _ChatEmptyState extends StatelessWidget {
-  const _ChatEmptyState({required this.l10n});
+  const _ChatEmptyState({
+    required this.l10n,
+    required this.discoveryCommands,
+    required this.onSelectCommand,
+  });
 
   final AppLocalizations l10n;
+  final List<ChatCommandSuggestion> discoveryCommands;
+  final ValueChanged<String> onSelectCommand;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasDiscovery = discoveryCommands.isNotEmpty;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -457,6 +490,83 @@ class _ChatEmptyState extends StatelessWidget {
               l10n.chatEmptySubtitle,
               style: theme.textTheme.bodySmall,
               textAlign: TextAlign.center,
+            ),
+            if (hasDiscovery) ...[
+              const SizedBox(height: 16),
+              Text(
+                l10n.chatCommandDiscoveryPrompt,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final command in discoveryCommands)
+                    _DiscoveryCommandChip(
+                      command: command.command,
+                      description: _descriptionLabel(
+                        l10n,
+                        command.descriptionKey,
+                      ),
+                      onPressed: () => onSelectCommand(command.template),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscoveryCommandChip extends StatelessWidget {
+  const _DiscoveryCommandChip({
+    required this.command,
+    required this.description,
+    required this.onPressed,
+  });
+
+  final String command;
+  final String description;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(14),
+      child: Ink(
+        width: 138,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.86),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: theme.colorScheme.outline.withOpacity(0.65),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              command,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              description,
+              style: theme.textTheme.bodySmall,
             ),
           ],
         ),
@@ -534,5 +644,30 @@ class _ConnectionStrip extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+String _descriptionLabel(AppLocalizations l10n, String key) {
+  switch (key) {
+    case 'commandDescriptionNew':
+      return l10n.commandDescriptionNew;
+    case 'commandDescriptionStatus':
+      return l10n.commandDescriptionStatus;
+    case 'commandDescriptionModel':
+      return l10n.commandDescriptionModel;
+    case 'commandDescriptionThink':
+      return l10n.commandDescriptionThink;
+    case 'commandDescriptionHelp':
+      return l10n.commandDescriptionHelp;
+    case 'commandDescriptionReset':
+      return l10n.commandDescriptionReset;
+    case 'commandDescriptionCompact':
+      return l10n.commandDescriptionCompact;
+    case 'commandDescriptionStop':
+      return l10n.commandDescriptionStop;
+    case 'commandDescriptionFast':
+      return l10n.commandDescriptionFast;
+    default:
+      return key;
   }
 }
