@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../models/app_error_notice.dart';
+import 'app_error_controller.dart';
 import '../../domain/models/connection_status.dart';
 import '../../domain/models/gateway_failure.dart';
 import '../../domain/models/gateway_config.dart';
@@ -12,11 +14,13 @@ class ConnectionController extends ChangeNotifier {
     ConnectionStatus? initialStatus,
     TestConnectionUseCase? testConnectionUseCase,
     GatewayConfig Function()? configProvider,
+    AppErrorController? appErrorController,
     bool isStub = false,
   })  : _status =
             initialStatus ?? const ConnectionStatus(phase: ConnectionPhase.idle),
         _testConnectionUseCase = testConnectionUseCase,
         _configProvider = configProvider,
+        _appErrorController = appErrorController,
         _isStub = isStub;
 
   factory ConnectionController.fake() => ConnectionController(isStub: true);
@@ -24,9 +28,11 @@ class ConnectionController extends ChangeNotifier {
   ConnectionStatus _status;
   final TestConnectionUseCase? _testConnectionUseCase;
   final GatewayConfig Function()? _configProvider;
+  final AppErrorController? _appErrorController;
   final bool _isStub;
   bool _autoConnectInFlight = false;
   bool _autoConnectSucceeded = false;
+  AppErrorNotice? errorNotice;
 
   bool get isStub => _isStub;
 
@@ -138,6 +144,7 @@ class ConnectionController extends ChangeNotifier {
     try {
       final status = await useCase.call(config: config);
       _status = status;
+      errorNotice = null;
       openClawLog(
         'ConnectionController',
         'testConnection success',
@@ -166,6 +173,7 @@ class ConnectionController extends ChangeNotifier {
       phase: ConnectionPhase.connecting,
       clearFailure: true,
     );
+    errorNotice = null;
     notifyListeners();
   }
 
@@ -178,11 +186,19 @@ class ConnectionController extends ChangeNotifier {
       grantedScopes: List<String>.from(grantedScopes),
       deviceId: deviceId ?? _status.deviceId,
     );
+    errorNotice = null;
     notifyListeners();
   }
 
   void markFailed(String message, {String code = 'UNKNOWN'}) {
     final mappedMessage = mapGatewayFailure(code: code, reason: message);
+    errorNotice = AppErrorNotice.fromRaw(
+      id: _nextErrorId(),
+      scope: AppErrorScope.connection,
+      presentation: AppErrorPresentation.inline,
+      rawMessage: message,
+      code: code,
+    );
     _status = _status.copyWith(
       phase: ConnectionPhase.failed,
       failure: GatewayFailure.fromCode(
@@ -191,6 +207,13 @@ class ConnectionController extends ChangeNotifier {
         message: mappedMessage,
       ),
     );
+    if (errorNotice!.kind == AppErrorKind.unexpected) {
+      _appErrorController?.publish(
+        errorNotice!.copyWith(
+          presentation: AppErrorPresentation.global,
+        ),
+      );
+    }
     notifyListeners();
   }
 
@@ -202,7 +225,13 @@ class ConnectionController extends ChangeNotifier {
       grantedScopes: const <String>[],
       deviceId: deviceId,
     );
+    errorNotice = null;
     notifyListeners();
+  }
+
+  String _nextErrorId() {
+    return _appErrorController?.nextId() ??
+        'connection-error-${DateTime.now().microsecondsSinceEpoch}';
   }
 
   static bool _isInProgressPhase(ConnectionPhase phase) {

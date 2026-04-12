@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_openclaw/l10n/app_localizations.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../application/models/app_error_notice.dart';
 import '../../application/controllers/chat_controller.dart';
 import '../../application/controllers/connection_controller.dart';
 import '../../application/controllers/settings_controller.dart';
@@ -17,6 +18,7 @@ import '../../infrastructure/util/openclaw_logger.dart';
 import '../localization/localized_gateway_text.dart';
 import '../widgets/chat_command_assist.dart';
 import '../widgets/chat_composer.dart';
+import '../widgets/error_notice_banner.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/status_badge.dart';
 import 'settings_screen.dart';
@@ -83,7 +85,6 @@ class _ChatScreenState extends State<ChatScreen> {
           l10n,
           widget.connectionController.sendBlockedReason,
         );
-        final localizedFailureMessage = _localizedChatError(l10n);
         final messages = widget.chatController.messages;
         final trimmedDraft = composerController.text.trimLeft();
         final commandHint = analyzeChatDraft(composerController.text).hintKind;
@@ -148,18 +149,16 @@ class _ChatScreenState extends State<ChatScreen> {
                     ],
                     if (connectionStatus.isReady &&
                         blockedReason.isNotEmpty) ...[
-                      _ChatBanner(
+                      _InfoBanner(
                         message: blockedReason,
                         color: const Color(0xFFFFF2D9),
                         textColor: const Color(0xFF8A5A00),
                       ),
                       const SizedBox(height: 8),
                     ],
-                    if ((widget.chatController.errorMessage ?? '').isNotEmpty) ...[
-                      _ChatBanner(
-                        message: localizedFailureMessage,
-                        color: theme.colorScheme.errorContainer,
-                        textColor: theme.colorScheme.onErrorContainer,
+                    if (widget.chatController.errorNotice != null) ...[
+                      ErrorNoticeBanner(
+                        notice: widget.chatController.errorNotice!,
                       ),
                       const SizedBox(height: 8),
                     ],
@@ -347,8 +346,17 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _presentPickerError(String message) {
-    widget.chatController.errorMessage = message;
-    widget.chatController.notifyListeners();
+    final l10n = AppLocalizations.of(context)!;
+    final kind = message == l10n.pickerErrorChannel
+        ? AppErrorKind.pickerChannel
+        : message == l10n.pickerErrorUnavailable
+            ? AppErrorKind.pickerUnavailable
+            : AppErrorKind.pickerGeneric;
+    widget.chatController.showInlineError(
+      kind: kind,
+      rawMessage: message,
+      code: 'PICKER_ERROR',
+    );
   }
 
   static String _inferMimeType(String fileName) {
@@ -414,18 +422,10 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     return '';
   }
-
-  String _localizedChatError(AppLocalizations l10n) {
-    final rawError = widget.chatController.errorMessage ?? '';
-    if (rawError.isEmpty) {
-      return '';
-    }
-    return localizedGatewayFailure(l10n, rawReason: rawError);
-  }
 }
 
-class _ChatBanner extends StatelessWidget {
-  const _ChatBanner({
+class _InfoBanner extends StatelessWidget {
+  const _InfoBanner({
     required this.message,
     required this.color,
     required this.textColor,

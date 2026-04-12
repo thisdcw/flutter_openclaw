@@ -62,12 +62,9 @@ String localizedGatewayFailure(
     case GatewayFailureType.protocolError:
       return l10n.gatewayFailureProtocolError;
     case GatewayFailureType.unknown:
-      if (resolvedFailure.reason.trim().isNotEmpty) {
-        return resolvedFailure.reason;
-      }
-      return l10n.gatewayFailureUnknown(
-        resolvedFailure.code,
-        resolvedFailure.reason,
-      );
+      final isChinese = l10n.localeName.toLowerCase().startsWith('zh');
+      return isChinese
+          ? 'Gateway 连接失败，请稍后重试。'
+          : 'The gateway connection failed. Please try again.';
   }
 }

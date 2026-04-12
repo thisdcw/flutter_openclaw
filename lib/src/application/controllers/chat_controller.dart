@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../models/app_error_notice.dart';
+import 'app_error_controller.dart';
 import '../../domain/models/chat_draft.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/gateway_config.dart';
@@ -13,11 +15,13 @@ class ChatController extends ChangeNotifier {
     SendChatMessageUseCase? sendChatMessageUseCase,
     GatewayConfig Function()? configProvider,
     String Function()? sessionIdProvider,
+    AppErrorController? appErrorController,
     bool isStub = false,
   })  : _chatRepository = chatRepository,
         _sendChatMessageUseCase = sendChatMessageUseCase,
         _configProvider = configProvider,
         _sessionIdProvider = sessionIdProvider,
+        _appErrorController = appErrorController,
         _isStub = isStub;
 
   factory ChatController.fake() => ChatController(isStub: true);
@@ -26,11 +30,13 @@ class ChatController extends ChangeNotifier {
   final SendChatMessageUseCase? _sendChatMessageUseCase;
   final GatewayConfig Function()? _configProvider;
   final String Function()? _sessionIdProvider;
+  final AppErrorController? _appErrorController;
   final bool _isStub;
   final List<ChatMessage> _messages = <ChatMessage>[];
 
   bool isSending = false;
   String? errorMessage;
+  AppErrorNotice? errorNotice;
 
   bool get isStub => _isStub;
 
@@ -56,6 +62,8 @@ class ChatController extends ChangeNotifier {
     );
 
     isSending = true;
+    errorMessage = null;
+    errorNotice = null;
     if (shouldClearLocalHistory) {
       _messages.clear();
     }
@@ -88,12 +96,14 @@ class ChatController extends ChangeNotifier {
       );
       isSending = false;
       errorMessage = null;
+      errorNotice = null;
       notifyListeners();
       return;
     }
 
     try {
       errorMessage = null;
+      errorNotice = null;
       final stream = hasUseCase
           ? sendChatMessageUseCase.call(
               draft,
@@ -126,19 +136,26 @@ class ChatController extends ChangeNotifier {
             message.text.isEmpty,
       );
       errorMessage = rawReason;
+      errorNotice = AppErrorNotice.fromRaw(
+        id: _nextErrorId(),
+        scope: AppErrorScope.chat,
+        presentation: AppErrorPresentation.inline,
+        rawMessage: rawReason,
+        code: 'CHAT_SEND_FAILED',
+      );
+      if (errorNotice!.kind == AppErrorKind.unexpected) {
+        _appErrorController?.publish(
+          errorNotice!.copyWith(
+            presentation: AppErrorPresentation.global,
+          ),
+        );
+      }
       openClawLog(
         'ChatController',
         'send failed',
         fields: <String, Object?>{
           'error': rawReason,
         },
-      );
-      _messages.add(
-        ChatMessage(
-          id: 'error-${_messages.length}',
-          role: MessageRole.error,
-          text: rawReason,
-        ),
       );
       notifyListeners();
     } finally {
@@ -158,7 +175,37 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void showInlineError({
+    required AppErrorKind kind,
+    required String rawMessage,
+    String? code,
+    bool reportGlobally = false,
+  }) {
+    errorMessage = rawMessage;
+    errorNotice = AppErrorNotice.fromRaw(
+      id: _nextErrorId(),
+      scope: AppErrorScope.chat,
+      presentation: AppErrorPresentation.inline,
+      rawMessage: rawMessage,
+      code: code,
+      kind: kind,
+    );
+    if (reportGlobally) {
+      _appErrorController?.publish(
+        errorNotice!.copyWith(
+          presentation: AppErrorPresentation.global,
+        ),
+      );
+    }
+    notifyListeners();
+  }
+
   static bool _shouldClearLocalHistory(String normalizedText) {
     return normalizedText == '/new';
+  }
+
+  String _nextErrorId() {
+    return _appErrorController?.nextId() ??
+        'chat-error-${DateTime.now().microsecondsSinceEpoch}';
   }
 }

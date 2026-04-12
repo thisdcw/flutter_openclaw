@@ -6,6 +6,7 @@ import '../../application/controllers/connection_controller.dart';
 import '../../application/controllers/settings_controller.dart';
 import '../../domain/models/app_locale_preference.dart';
 import '../widgets/connection_summary_card.dart';
+import '../widgets/error_notice_banner.dart';
 import '../widgets/settings_form.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -84,9 +85,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 deviceId: deviceId,
                 scopes: connectionController.grantedScopes,
               ),
-              if ((connectionController.errorMessage ?? '').isNotEmpty) ...[
+              if (connectionController.errorNotice != null) ...[
                 const SizedBox(height: 14),
-                _InlineBanner(message: connectionController.errorMessage!),
+                ErrorNoticeBanner(
+                  notice: connectionController.errorNotice!,
+                ),
               ],
               const SizedBox(height: 18),
               Card(
@@ -157,30 +160,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InlineBanner extends StatelessWidget {
-  const _InlineBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Text(
-        message,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onErrorContainer,
         ),
       ),
     );

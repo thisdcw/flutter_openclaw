@@ -3,8 +3,6 @@ import '../../domain/models/gateway_config.dart';
 const List<String> defaultOperatorScopes = <String>[
   'operator.read',
   'operator.write',
-  'operator.admin',
-  'operator.approvals',
   'operator.pairing',
 ];
 

@@ -1,3 +1,4 @@
+import 'package:flutter_openclaw/src/application/controllers/app_error_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter_openclaw/src/application/controllers/chat_controller.dart';
@@ -21,13 +22,19 @@ class AppDependencies {
     required this.settingsController,
     required this.connectionController,
     required this.chatController,
+    required this.appErrorController,
   });
 
   final SettingsController settingsController;
   final ConnectionController connectionController;
   final ChatController chatController;
+  final AppErrorController appErrorController;
 
-  static Future<AppDependencies> create() async {
+  static Future<AppDependencies> create({
+    AppErrorController? appErrorController,
+  }) async {
+    final resolvedAppErrorController =
+        appErrorController ?? AppErrorController();
     final prefs = await SharedPreferences.getInstance();
     final configRepository = SharedPrefsConfigRepository(prefs);
     final appLocalePreferenceRepository =
@@ -72,25 +79,36 @@ class AppDependencies {
       ),
       testConnectionUseCase: testConnectionUseCase,
       configProvider: () => settingsController.config,
+      appErrorController: resolvedAppErrorController,
     );
     final chatController = ChatController(
       sendChatMessageUseCase: sendChatMessageUseCase,
       configProvider: () => settingsController.config,
       sessionIdProvider: () => settingsController.config.sessionId,
+      appErrorController: resolvedAppErrorController,
     );
 
     return AppDependencies(
       settingsController: settingsController,
       connectionController: connectionController,
       chatController: chatController,
+      appErrorController: resolvedAppErrorController,
     );
   }
 
   static AppDependencies fake() {
+    final appErrorController = AppErrorController();
     return AppDependencies(
       settingsController: SettingsController.fake(),
-      connectionController: ConnectionController.fake(),
-      chatController: ChatController.fake(),
+      connectionController: ConnectionController(
+        isStub: true,
+        appErrorController: appErrorController,
+      ),
+      chatController: ChatController(
+        isStub: true,
+        appErrorController: appErrorController,
+      ),
+      appErrorController: appErrorController,
     );
   }
 }
