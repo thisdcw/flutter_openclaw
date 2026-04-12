@@ -25,14 +25,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsIntro =>
-      'Review live connection state and tune your chat session configuration.';
+      'Review live connection state, app preferences, and the current gateway session details.';
+
+  @override
+  String get basicSettingsTitle => 'Basic Settings';
+
+  @override
+  String get basicSettingsSubtitle =>
+      'Manage app-level preferences for this device.';
 
   @override
   String get gatewayConfigurationTitle => 'Gateway Configuration';
 
   @override
   String get gatewayConfigurationSubtitle =>
-      'Keep the chat session details up to date. Connection can be retried directly from the chat page when needed.';
+      'Gateway session details are managed by the client and shown here for reference. Connection can be retried directly from the chat page when needed.';
 
   @override
   String get connectionOverviewTitle => 'Connection Overview';

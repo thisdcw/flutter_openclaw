@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:flutter_openclaw/l10n/app_localizations.dart';
 import 'package:flutter_openclaw/src/application/controllers/chat_controller.dart';
 import 'package:flutter_openclaw/src/application/controllers/connection_controller.dart';
+import 'package:flutter_openclaw/src/application/controllers/settings_controller.dart';
 import 'package:flutter_openclaw/src/app/openclaw_app.dart';
 import 'package:flutter_openclaw/src/app/app_dependencies.dart';
 import 'package:flutter_openclaw/src/presentation/screens/chat_screen.dart';
+import 'package:flutter_openclaw/src/presentation/screens/settings_screen.dart';
 
 void main() {
   testWidgets('chat screen is the home view', (WidgetTester tester) async {
@@ -73,5 +76,29 @@ void main() {
 
     expect(find.text('missing scope: operator.write'), findsOneWidget);
     expect(find.text('Connection'), findsNothing);
+  });
+
+  testWidgets(
+      'settings screen separates basic settings from readonly gateway details',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: SettingsScreen(
+          settingsController: SettingsController.fake(),
+          connectionController: ConnectionController.fake(),
+          chatController: ChatController.fake(),
+        ),
+      ),
+    );
+
+    expect(find.text('Basic Settings'), findsOneWidget);
+    expect(find.text('App Language'), findsOneWidget);
+    expect(find.text('Gateway Configuration'), findsOneWidget);
+    expect(find.text('Session ID'), findsOneWidget);
+    expect(find.text('Timeout (ms)'), findsOneWidget);
+    expect(find.text('Save Settings'), findsNothing);
+    expect(find.byType(TextField), findsNothing);
   });
 }

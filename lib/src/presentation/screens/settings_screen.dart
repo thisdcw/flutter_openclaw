@@ -5,8 +5,6 @@ import '../../application/controllers/chat_controller.dart';
 import '../../application/controllers/connection_controller.dart';
 import '../../application/controllers/settings_controller.dart';
 import '../../domain/models/app_locale_preference.dart';
-import '../../domain/models/gateway_config.dart';
-import '../../infrastructure/util/openclaw_logger.dart';
 import '../widgets/connection_summary_card.dart';
 import '../widgets/settings_form.dart';
 
@@ -27,33 +25,12 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late final TextEditingController gatewayUrlController;
-  late final TextEditingController authTokenController;
-  late final TextEditingController sessionIdController;
-  late final TextEditingController localeController;
-  late final TextEditingController timeoutController;
   late AppLocalePreference localePreference;
 
   @override
   void initState() {
     super.initState();
-    final config = widget.settingsController.config;
     localePreference = widget.settingsController.localePreference;
-    gatewayUrlController = TextEditingController(text: config.gatewayUrl);
-    authTokenController = TextEditingController(text: config.authToken);
-    sessionIdController = TextEditingController(text: config.sessionId);
-    localeController = TextEditingController(text: config.locale);
-    timeoutController = TextEditingController(text: '${config.timeoutMs}');
-  }
-
-  @override
-  void dispose() {
-    gatewayUrlController.dispose();
-    authTokenController.dispose();
-    sessionIdController.dispose();
-    localeController.dispose();
-    timeoutController.dispose();
-    super.dispose();
   }
 
   @override
@@ -61,6 +38,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final connectionController = widget.connectionController;
+    final config = widget.settingsController.config;
     final deviceId = connectionController.status.deviceId ?? l10n.pendingDeviceLabel;
 
     return Scaffold(
@@ -118,6 +96,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
+                        l10n.basicSettingsTitle,
+                        style: theme.textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        l10n.basicSettingsSubtitle,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 18),
+                      SettingsForm(
+                        localePreference: localePreference,
+                        onLocalePreferenceChanged: (next) async {
+                          setState(() {
+                            localePreference = next;
+                          });
+                          await widget.settingsController.saveLocalePreference(
+                            next,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
                         l10n.gatewayConfigurationTitle,
                         style: theme.textTheme.titleLarge,
                       ),
@@ -127,20 +137,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: theme.textTheme.bodySmall,
                       ),
                       const SizedBox(height: 18),
-                      SettingsForm(
-                        localePreference: localePreference,
-                        sessionIdController: sessionIdController,
-                        localeController: localeController,
-                        timeoutController: timeoutController,
-                        onLocalePreferenceChanged: (next) async {
-                          setState(() {
-                            localePreference = next;
-                          });
-                          await widget.settingsController.saveLocalePreference(
-                            next,
-                          );
-                        },
-                        onSave: _saveSettings,
+                      _ReadonlySettingRow(
+                        label: l10n.sessionIdLabel,
+                        value: config.sessionId,
+                      ),
+                      const SizedBox(height: 14),
+                      _ReadonlySettingRow(
+                        label: l10n.gatewayLocaleLabel,
+                        value: config.locale,
+                      ),
+                      const SizedBox(height: 14),
+                      _ReadonlySettingRow(
+                        label: l10n.timeoutLabel,
+                        value: '${config.timeoutMs}',
                       ),
                     ],
                   ),
@@ -151,32 +160,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _saveSettings() async {
-    final current = widget.settingsController.config;
-    final timeoutMs =
-        int.tryParse(timeoutController.text.trim()) ?? current.timeoutMs;
-    final next = GatewayConfig(
-      gatewayUrl: gatewayUrlController.text.trim(),
-      authToken: authTokenController.text.trim(),
-      sessionId: sessionIdController.text.trim(),
-      timeoutMs: timeoutMs,
-      locale: localeController.text.trim(),
-    );
-
-    openClawLog(
-      'SettingsScreen',
-      'save tapped',
-      fields: <String, Object?>{
-        'gatewayUrl': next.gatewayUrl,
-        'sessionId': next.sessionId,
-        'timeoutMs': next.timeoutMs,
-        'locale': next.locale,
-        'authToken': redactValue(next.authToken),
-      },
-    );
-    await widget.settingsController.save(next);
   }
 }
 
@@ -199,6 +182,51 @@ class _InlineBanner extends StatelessWidget {
         style: theme.textTheme.bodyMedium?.copyWith(
           color: theme.colorScheme.onErrorContainer,
         ),
+      ),
+    );
+  }
+}
+
+class _ReadonlySettingRow extends StatelessWidget {
+  const _ReadonlySettingRow({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withOpacity(0.55),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -131,8 +131,20 @@ abstract class AppLocalizations {
   /// No description provided for @settingsIntro.
   ///
   /// In en, this message translates to:
-  /// **'Review live connection state and tune your chat session configuration.'**
+  /// **'Review live connection state, app preferences, and the current gateway session details.'**
   String get settingsIntro;
+
+  /// No description provided for @basicSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Basic Settings'**
+  String get basicSettingsTitle;
+
+  /// No description provided for @basicSettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage app-level preferences for this device.'**
+  String get basicSettingsSubtitle;
 
   /// No description provided for @gatewayConfigurationTitle.
   ///
@@ -143,7 +155,7 @@ abstract class AppLocalizations {
   /// No description provided for @gatewayConfigurationSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Keep the chat session details up to date. Connection can be retried directly from the chat page when needed.'**
+  /// **'Gateway session details are managed by the client and shown here for reference. Connection can be retried directly from the chat page when needed.'**
   String get gatewayConfigurationSubtitle;
 
   /// No description provided for @connectionOverviewTitle.

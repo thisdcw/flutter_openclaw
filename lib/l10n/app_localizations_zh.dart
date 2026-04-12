@@ -24,13 +24,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsOpenTooltip => '打开设置';
 
   @override
-  String get settingsIntro => '查看当前连接状态，并调整你的聊天会话配置。';
+  String get settingsIntro => '查看实时连接状态、应用偏好，以及当前网关会话详情。';
+
+  @override
+  String get basicSettingsTitle => '基础设置';
+
+  @override
+  String get basicSettingsSubtitle => '管理当前设备上的应用级偏好设置。';
 
   @override
   String get gatewayConfigurationTitle => '网关配置';
 
   @override
-  String get gatewayConfigurationSubtitle => '保持聊天会话配置为最新。需要时可以直接在聊天页重试连接。';
+  String get gatewayConfigurationSubtitle =>
+      'Gateway 会话详情由客户端管理，这里仅作展示。需要时可以直接在聊天页重试连接。';
 
   @override
   String get connectionOverviewTitle => '连接概览';
