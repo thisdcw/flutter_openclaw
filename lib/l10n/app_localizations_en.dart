@@ -58,6 +58,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get grantedScopesLabel => 'Granted Scopes';
 
   @override
+  String get copyValueTooltip => 'Copy';
+
+  @override
+  String get copiedDeviceIdMessage => 'Copied device ID';
+
+  @override
+  String get copiedGrantedScopesMessage => 'Copied granted scopes';
+
+  @override
   String get noneLabel => '(none)';
 
   @override

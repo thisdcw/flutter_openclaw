@@ -55,6 +55,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get grantedScopesLabel => '已授予权限';
 
   @override
+  String get copyValueTooltip => '复制';
+
+  @override
+  String get copiedDeviceIdMessage => '已复制设备 ID';
+
+  @override
+  String get copiedGrantedScopesMessage => '已复制权限信息';
+
+  @override
   String get noneLabel => '（无）';
 
   @override

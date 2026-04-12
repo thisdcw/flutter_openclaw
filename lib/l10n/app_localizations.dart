@@ -188,6 +188,24 @@ abstract class AppLocalizations {
   /// **'Granted Scopes'**
   String get grantedScopesLabel;
 
+  /// No description provided for @copyValueTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copyValueTooltip;
+
+  /// No description provided for @copiedDeviceIdMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied device ID'**
+  String get copiedDeviceIdMessage;
+
+  /// No description provided for @copiedGrantedScopesMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied granted scopes'**
+  String get copiedGrantedScopesMessage;
+
   /// No description provided for @noneLabel.
   ///
   /// In en, this message translates to:
