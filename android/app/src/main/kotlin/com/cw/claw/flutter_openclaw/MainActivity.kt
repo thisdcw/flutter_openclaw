@@ -22,12 +22,35 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        val keystoreSigner = KeystoreSigner(KEY_ALIAS)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             CHANNEL_NAME,
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "saveImage" -> saveImage(call, result)
+                else -> result.notImplemented()
+            }
+        }
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            KEYSTORE_CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "ensureKeypair" -> {
+                    val publicKey = keystoreSigner.ensureKeypair()
+                    result.success(KeystoreSigner.base64(publicKey))
+                }
+                "signPayload" -> {
+                    val payload = call.argument<String>("payload") ?: ""
+                    val signature = keystoreSigner.sign(payload.toByteArray(Charsets.UTF_8))
+                    result.success(KeystoreSigner.base64Url(signature))
+                }
+                "clearKeypair" -> {
+                    keystoreSigner.clear()
+                    result.success(true)
+                }
                 else -> result.notImplemented()
             }
         }
@@ -176,6 +199,8 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val CHANNEL_NAME = "openclaw/media"
+        private const val KEYSTORE_CHANNEL = "openclaw/keystore"
+        private const val KEY_ALIAS = "openclaw.device.signing"
         private const val REQUEST_WRITE_STORAGE = 2407
     }
 }
