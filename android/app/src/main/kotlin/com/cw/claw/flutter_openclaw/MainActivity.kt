@@ -42,11 +42,19 @@ class MainActivity : FlutterActivity() {
                     val publicKey = keystoreSigner.ensureKeypair()
                     result.success(KeystoreSigner.base64(publicKey))
                 }
-                "signPayload" -> {
-                    val payload = call.argument<String>("payload") ?: ""
-                    val signature = keystoreSigner.sign(payload.toByteArray(Charsets.UTF_8))
-                    result.success(KeystoreSigner.base64Url(signature))
+            "signPayload" -> {
+                val payload = call.argument<String>("payload")
+                if (payload.isNullOrEmpty()) {
+                    result.error(
+                        "missing-payload",
+                        "Payload is required for signing.",
+                        null,
+                    )
+                    return@setMethodCallHandler
                 }
+                val signature = keystoreSigner.sign(payload.toByteArray(Charsets.UTF_8))
+                result.success(KeystoreSigner.base64Url(signature))
+            }
                 "clearKeypair" -> {
                     keystoreSigner.clear()
                     result.success(true)
