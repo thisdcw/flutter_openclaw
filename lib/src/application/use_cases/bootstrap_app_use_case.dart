@@ -51,13 +51,10 @@ class BootstrapAppUseCase {
     }
 
     final operatorAuth = await _authRepository.loadOperatorAuth();
-    final persistedToken = await _authRepository.loadAuthToken();
     openClawLog(
       'Bootstrap',
       'auth snapshot loaded',
       fields: <String, Object?>{
-        'hasPersistedAuthToken': (persistedToken ?? '').trim().isNotEmpty,
-        'persistedAuthToken': redactValue(persistedToken ?? ''),
         'hasDeviceToken': (operatorAuth?.deviceToken ?? '').isNotEmpty,
         'deviceToken': redactValue(operatorAuth?.deviceToken ?? ''),
         'scopes': operatorAuth?.scopes.join(',') ?? '(none)',

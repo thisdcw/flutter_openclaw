@@ -77,7 +77,6 @@ class TestConnectionUseCase {
         'locale': config.locale,
       },
     );
-    final authToken = await _resolveAuthToken();
     final existingIdentity = await _authRepository.loadDeviceIdentity();
     final deviceIdentity = existingIdentity ?? await _identityService.create();
     openClawLog(
@@ -128,7 +127,7 @@ class TestConnectionUseCase {
       final connectParams = await _signer.buildConnectParams(
         challenge: challengeModel,
         identity: deviceIdentity,
-        authToken: authToken,
+        authToken: '',
         deviceToken: operatorAuth?.deviceToken ?? '',
         locale: config.locale,
       );
@@ -205,10 +204,6 @@ class TestConnectionUseCase {
           },
         );
       }
-      if (authToken.trim().isNotEmpty) {
-        await _authRepository.saveAuthToken(authToken);
-      }
-
       openClawLog(
         'TestConnection',
         'connect success',
@@ -241,16 +236,4 @@ class TestConnectionUseCase {
     }
   }
 
-  Future<String> _resolveAuthToken() async {
-    final persistedToken = await _authRepository.loadAuthToken();
-    if ((persistedToken ?? '').trim().isNotEmpty) {
-      openClawLog(
-        'TestConnection',
-        'resolve auth token from secure storage',
-      );
-      return persistedToken!;
-    }
-    openClawLog('TestConnection', 'resolve auth token: empty');
-    return '';
-  }
 }
