@@ -30,6 +30,7 @@ class SharedPrefsConfigRepository implements ConfigRepository {
 
     try {
       final map = jsonDecode(jsonString) as Map<String, dynamic>;
+      map.remove('authToken');
       final config = GatewayConfig.fromJson(map);
       openClawLog(
         'ConfigRepository',
@@ -39,7 +40,6 @@ class SharedPrefsConfigRepository implements ConfigRepository {
           'sessionId': config.sessionId,
           'timeoutMs': config.timeoutMs,
           'locale': config.locale,
-          'authToken': redactValue(config.authToken),
         },
       );
       return config;
@@ -65,10 +65,9 @@ class SharedPrefsConfigRepository implements ConfigRepository {
         'gatewayUrl': config.gatewayUrl,
         'sessionId': config.sessionId,
         'timeoutMs': config.timeoutMs,
-        'locale': config.locale,
-        'authToken': redactValue(config.authToken),
-      },
-    );
+          'locale': config.locale,
+        },
+      );
     await _prefs.setString(_storageKey, encoded);
   }
 }

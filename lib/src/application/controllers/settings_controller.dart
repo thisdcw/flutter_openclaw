@@ -57,7 +57,6 @@ class SettingsController extends ChangeNotifier {
         'sessionId': next.sessionId,
         'timeoutMs': next.timeoutMs,
         'locale': next.locale,
-        'authToken': redactValue(next.authToken),
       },
     );
     _config = next;
@@ -73,7 +72,6 @@ class SettingsController extends ChangeNotifier {
         'sessionId': next.sessionId,
         'timeoutMs': next.timeoutMs,
         'locale': next.locale,
-        'authToken': redactValue(next.authToken),
       },
     );
     _config = next;

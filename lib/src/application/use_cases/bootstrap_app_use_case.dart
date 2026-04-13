@@ -41,7 +41,6 @@ class BootstrapAppUseCase {
         'sessionId': config.sessionId,
         'timeoutMs': config.timeoutMs,
         'locale': config.locale,
-        'authToken': redactValue(config.authToken),
         'deviceId': identity.id,
         'identitySource': existingIdentity == null ? 'generated' : 'persisted',
       },
@@ -64,12 +63,6 @@ class BootstrapAppUseCase {
         'scopes': operatorAuth?.scopes.join(',') ?? '(none)',
       },
     );
-    if ((persistedToken ?? '').trim().isEmpty &&
-        config.authToken.trim().isNotEmpty) {
-      openClawLog('Bootstrap', 'persist config auth token into secure storage');
-      await _authRepository.saveAuthToken(config.authToken);
-    }
-
     return BootstrapAppResult(
       config: config,
       deviceIdentity: identity,

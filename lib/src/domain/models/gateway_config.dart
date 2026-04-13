@@ -1,13 +1,11 @@
 class GatewayConfig {
   final String gatewayUrl;
-  final String authToken;
   final String sessionId;
   final int timeoutMs;
   final String locale;
 
   const GatewayConfig({
     required this.gatewayUrl,
-    required this.authToken,
     required this.sessionId,
     required this.timeoutMs,
     required this.locale,
@@ -15,14 +13,12 @@ class GatewayConfig {
 
   GatewayConfig copyWith({
     String? gatewayUrl,
-    String? authToken,
     String? sessionId,
     int? timeoutMs,
     String? locale,
   }) {
     return GatewayConfig(
       gatewayUrl: gatewayUrl ?? this.gatewayUrl,
-      authToken: authToken ?? this.authToken,
       sessionId: sessionId ?? this.sessionId,
       timeoutMs: timeoutMs ?? this.timeoutMs,
       locale: locale ?? this.locale,
@@ -32,7 +28,6 @@ class GatewayConfig {
   Map<String, dynamic> toJson() {
     return {
       'gatewayUrl': gatewayUrl,
-      'authToken': authToken,
       'sessionId': sessionId,
       'timeoutMs': timeoutMs,
       'locale': locale,
@@ -42,7 +37,6 @@ class GatewayConfig {
   factory GatewayConfig.fromJson(Map<String, dynamic> json) {
     return GatewayConfig(
       gatewayUrl: _string(json, 'gatewayUrl'),
-      authToken: _string(json, 'authToken'),
       sessionId: _string(json, 'sessionId'),
       timeoutMs: _int(json, 'timeoutMs'),
       locale: _string(json, 'locale'),
@@ -54,7 +48,6 @@ class GatewayConfig {
     if (identical(this, other)) return true;
     return other is GatewayConfig &&
         other.gatewayUrl == gatewayUrl &&
-        other.authToken == authToken &&
         other.sessionId == sessionId &&
         other.timeoutMs == timeoutMs &&
         other.locale == locale;
@@ -63,7 +56,6 @@ class GatewayConfig {
   @override
   int get hashCode => Object.hash(
         gatewayUrl,
-        authToken,
         sessionId,
         timeoutMs,
         locale,
@@ -71,8 +63,8 @@ class GatewayConfig {
 
   @override
   String toString() {
-    return 'GatewayConfig(gatewayUrl: $gatewayUrl, authToken: <redacted>, '
-        'sessionId: $sessionId, timeoutMs: $timeoutMs, locale: $locale)';
+    return 'GatewayConfig(gatewayUrl: $gatewayUrl, sessionId: $sessionId, '
+        'timeoutMs: $timeoutMs, locale: $locale)';
   }
 
   static String _string(Map<String, dynamic> json, String key) {

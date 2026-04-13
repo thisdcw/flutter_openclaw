@@ -75,10 +75,9 @@ class TestConnectionUseCase {
         'sessionId': config.sessionId,
         'timeoutMs': config.timeoutMs,
         'locale': config.locale,
-        'authToken': redactValue(config.authToken),
       },
     );
-    final authToken = await _resolveAuthToken(config);
+    final authToken = await _resolveAuthToken();
     final existingIdentity = await _authRepository.loadDeviceIdentity();
     final deviceIdentity = existingIdentity ?? await _identityService.create();
     openClawLog(
@@ -101,7 +100,6 @@ class TestConnectionUseCase {
         'hasDeviceToken': (operatorAuth?.deviceToken ?? '').isNotEmpty,
         'deviceToken': redactValue(operatorAuth?.deviceToken ?? ''),
         'scopes': operatorAuth?.scopes.join(',') ?? '(none)',
-        'resolvedAuthToken': redactValue(authToken),
       },
     );
     final channel = (_channelFactory ?? WebSocketChannel.connect)(
@@ -139,15 +137,14 @@ class TestConnectionUseCase {
         'TestConnection',
         'sending connect',
         fields: <String, Object?>{
-          'requestId': requestId,
-          'authMode': connectParams.auth.usesDeviceToken
-              ? 'deviceToken'
-              : 'token',
-          'deviceToken': redactValue(connectParams.auth.deviceToken ?? ''),
-          'authToken': redactValue(connectParams.auth.token ?? ''),
-          'clientMode': connectParams.client.mode,
-          'deviceId': connectParams.device.id,
-          'scopes': connectParams.scopes.join(','),
+      'requestId': requestId,
+      'authMode': connectParams.auth.usesDeviceToken
+          ? 'deviceToken'
+          : 'token',
+      'deviceToken': redactValue(connectParams.auth.deviceToken ?? ''),
+      'clientMode': connectParams.client.mode,
+      'deviceId': connectParams.device.id,
+      'scopes': connectParams.scopes.join(','),
         },
       );
 
@@ -244,25 +241,12 @@ class TestConnectionUseCase {
     }
   }
 
-  Future<String> _resolveAuthToken(GatewayConfig config) async {
-    if (config.authToken.trim().isNotEmpty) {
-      openClawLog(
-        'TestConnection',
-        'resolve auth token from config',
-        fields: <String, Object?>{
-          'value': redactValue(config.authToken),
-        },
-      );
-      return config.authToken;
-    }
+  Future<String> _resolveAuthToken() async {
     final persistedToken = await _authRepository.loadAuthToken();
     if ((persistedToken ?? '').trim().isNotEmpty) {
       openClawLog(
         'TestConnection',
         'resolve auth token from secure storage',
-        fields: <String, Object?>{
-          'value': redactValue(persistedToken!),
-        },
       );
       return persistedToken!;
     }
