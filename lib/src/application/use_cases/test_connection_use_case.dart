@@ -129,6 +129,7 @@ class TestConnectionUseCase {
         identity: deviceIdentity,
         authToken: '',
         deviceToken: operatorAuth?.deviceToken ?? '',
+        scopes: operatorAuth?.scopes ?? const [],
         locale: config.locale,
       );
       final requestId = 'auth-${_uuid.v4()}';
