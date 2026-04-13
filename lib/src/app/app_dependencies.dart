@@ -12,6 +12,7 @@ import 'package:flutter_openclaw/src/application/use_cases/test_connection_use_c
 import 'package:flutter_openclaw/src/domain/models/connection_status.dart';
 import 'package:flutter_openclaw/src/infrastructure/crypto/connect_signer.dart';
 import 'package:flutter_openclaw/src/infrastructure/crypto/device_identity_service.dart';
+import 'package:flutter_openclaw/src/infrastructure/crypto/keystore_signer.dart';
 import 'package:flutter_openclaw/src/infrastructure/gateway/gateway_protocol_parser.dart';
 import 'package:flutter_openclaw/src/infrastructure/storage/chat_conversation_store_factory.dart';
 import 'package:flutter_openclaw/src/infrastructure/storage/shared_prefs_app_locale_preference_repository.dart';
@@ -46,7 +47,8 @@ class AppDependencies {
     final chatStoreSnapshot = await chatConversationStore.bootstrap();
     final authRepository = SecureAuthRepository();
     final parser = const GatewayProtocolParser();
-    final signer = const ConnectSigner();
+    final keystoreSigner = const KeystoreSigner();
+    final signer = ConnectSigner(keystoreSigner: keystoreSigner);
     final identityService = DeviceIdentityService();
     final bootstrap = BootstrapAppUseCase(
       configRepository,
@@ -59,7 +61,10 @@ class AppDependencies {
     );
     final initialLocalePreference = await appLocalePreferenceRepository.load();
     final clearOperatorAuthUseCase = ClearOperatorAuthUseCase(authRepository);
-    final resetDeviceIdentityUseCase = ResetDeviceIdentityUseCase(authRepository);
+    final resetDeviceIdentityUseCase = ResetDeviceIdentityUseCase(
+      authRepository,
+      keystore: keystoreSigner,
+    );
     final testConnectionUseCase = TestConnectionUseCase(
       authRepository: authRepository,
       identityService: identityService,
