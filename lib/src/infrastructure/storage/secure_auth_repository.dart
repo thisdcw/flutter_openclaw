@@ -20,15 +20,8 @@ class SecureAuthRepository implements AuthRepository {
 
   static const String _deviceIdentityKey = 'openclaw.device_identity';
   static const String _operatorAuthStateKey = 'openclaw.operator_auth_state';
-  static const String _authTokenKey = 'openclaw.auth_token';
 
   final _SecureStorage _storage;
-
-  @override
-  Future<void> clearAuthToken() {
-    openClawLog('SecureAuthRepository', 'clear auth token');
-    return _storage.delete(key: _authTokenKey);
-  }
 
   @override
   Future<void> clearDeviceIdentity() {
@@ -40,20 +33,6 @@ class SecureAuthRepository implements AuthRepository {
   Future<void> clearOperatorAuth() {
     openClawLog('SecureAuthRepository', 'clear operator auth');
     return _storage.delete(key: _operatorAuthStateKey);
-  }
-
-  @override
-  Future<String?> loadAuthToken() async {
-    final token = await _storage.read(key: _authTokenKey);
-    openClawLog(
-      'SecureAuthRepository',
-      'load auth token',
-      fields: <String, Object?>{
-        'exists': (token ?? '').trim().isNotEmpty,
-        'value': redactValue(token ?? ''),
-      },
-    );
-    return token;
   }
 
   @override
@@ -115,18 +94,6 @@ class SecureAuthRepository implements AuthRepository {
     throw FormatException(
       'SecureAuthRepository: stored $valueName must be a JSON object.',
     );
-  }
-
-  @override
-  Future<void> saveAuthToken(String token) {
-    openClawLog(
-      'SecureAuthRepository',
-      'save auth token',
-      fields: <String, Object?>{
-        'value': redactValue(token),
-      },
-    );
-    return _storage.write(key: _authTokenKey, value: token);
   }
 
   @override

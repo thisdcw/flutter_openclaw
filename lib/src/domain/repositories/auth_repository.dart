@@ -9,8 +9,4 @@ abstract class AuthRepository {
   Future<OperatorAuthState?> loadOperatorAuth();
   Future<void> saveOperatorAuth(OperatorAuthState state);
   Future<void> clearOperatorAuth();
-
-  Future<String?> loadAuthToken();
-  Future<void> saveAuthToken(String token);
-  Future<void> clearAuthToken();
 }
