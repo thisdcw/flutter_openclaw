@@ -6,6 +6,7 @@ import 'package:flutter_openclaw/src/application/controllers/connection_controll
 import 'package:flutter_openclaw/src/application/controllers/settings_controller.dart';
 import 'package:flutter_openclaw/src/application/use_cases/bootstrap_app_use_case.dart';
 import 'package:flutter_openclaw/src/application/use_cases/clear_operator_auth_use_case.dart';
+import 'package:flutter_openclaw/src/application/use_cases/import_bootstrap_token_use_case.dart';
 import 'package:flutter_openclaw/src/application/use_cases/reset_device_identity_use_case.dart';
 import 'package:flutter_openclaw/src/application/use_cases/send_chat_message_use_case.dart';
 import 'package:flutter_openclaw/src/application/use_cases/test_connection_use_case.dart';
@@ -18,6 +19,7 @@ import 'package:flutter_openclaw/src/infrastructure/storage/chat_conversation_st
 import 'package:flutter_openclaw/src/infrastructure/storage/shared_prefs_app_locale_preference_repository.dart';
 import 'package:flutter_openclaw/src/infrastructure/storage/secure_auth_repository.dart';
 import 'package:flutter_openclaw/src/infrastructure/storage/shared_prefs_config_repository.dart';
+import 'package:flutter_openclaw/src/infrastructure/util/bootstrap_payload_parser.dart';
 
 class AppDependencies {
   AppDependencies({
@@ -65,6 +67,11 @@ class AppDependencies {
       authRepository,
       keystore: keystoreSigner,
     );
+    final importBootstrapTokenUseCase = ImportBootstrapTokenUseCase(
+      authRepository,
+      configRepository,
+      BootstrapPayloadParser(),
+    );
     final testConnectionUseCase = TestConnectionUseCase(
       authRepository: authRepository,
       identityService: identityService,
@@ -81,6 +88,7 @@ class AppDependencies {
       configRepository: configRepository,
       appLocalePreferenceRepository: appLocalePreferenceRepository,
       clearOperatorAuthUseCase: clearOperatorAuthUseCase,
+      importBootstrapTokenUseCase: importBootstrapTokenUseCase,
       resetDeviceIdentityUseCase: resetDeviceIdentityUseCase,
     );
     final connectionController = ConnectionController(

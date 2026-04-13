@@ -7,6 +7,7 @@ import '../../domain/repositories/config_repository.dart';
 import '../../infrastructure/config/dev_defaults.dart';
 import '../../infrastructure/util/openclaw_logger.dart';
 import '../use_cases/clear_operator_auth_use_case.dart';
+import '../use_cases/import_bootstrap_token_use_case.dart';
 import '../use_cases/reset_device_identity_use_case.dart';
 
 class SettingsController extends ChangeNotifier {
@@ -17,6 +18,7 @@ class SettingsController extends ChangeNotifier {
     ConfigRepository? configRepository,
     AppLocalePreferenceRepository? appLocalePreferenceRepository,
     ClearOperatorAuthUseCase? clearOperatorAuthUseCase,
+    ImportBootstrapTokenUseCase? importBootstrapTokenUseCase,
     ResetDeviceIdentityUseCase? resetDeviceIdentityUseCase,
     bool isStub = false,
   })  : _config = initialConfig ?? defaultGatewayConfig,
@@ -24,6 +26,7 @@ class SettingsController extends ChangeNotifier {
         _configRepository = configRepository,
         _appLocalePreferenceRepository = appLocalePreferenceRepository,
         _clearOperatorAuthUseCase = clearOperatorAuthUseCase,
+        _importBootstrapTokenUseCase = importBootstrapTokenUseCase,
         _resetDeviceIdentityUseCase = resetDeviceIdentityUseCase,
         _isStub = isStub;
 
@@ -40,6 +43,7 @@ class SettingsController extends ChangeNotifier {
   final ConfigRepository? _configRepository;
   final AppLocalePreferenceRepository? _appLocalePreferenceRepository;
   final ClearOperatorAuthUseCase? _clearOperatorAuthUseCase;
+  final ImportBootstrapTokenUseCase? _importBootstrapTokenUseCase;
   final ResetDeviceIdentityUseCase? _resetDeviceIdentityUseCase;
   final bool _isStub;
 
@@ -98,6 +102,11 @@ class SettingsController extends ChangeNotifier {
     openClawLog('SettingsController', 'reset device identity');
     await _resetDeviceIdentityUseCase?.call();
     await _clearOperatorAuthUseCase?.call();
+    notifyListeners();
+  }
+
+  Future<void> importBootstrapToken(String input) async {
+    await _importBootstrapTokenUseCase?.call(input);
     notifyListeners();
   }
 

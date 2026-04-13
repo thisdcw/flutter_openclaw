@@ -6,6 +6,8 @@ import '../../application/controllers/connection_controller.dart';
 import '../../application/controllers/settings_controller.dart';
 import '../../app/app_metadata.dart';
 import '../../domain/models/app_locale_preference.dart';
+import '../screens/bootstrap_scan_screen.dart';
+import '../widgets/bootstrap_import_sheet.dart';
 import '../widgets/connection_summary_card.dart';
 import '../widgets/error_notice_banner.dart';
 import '../widgets/settings_form.dart';
@@ -122,6 +124,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             next,
                           );
                         },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '配对管理',
+                        style: theme.textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  builder: (_) => BootstrapImportSheet(
+                                    onSubmit: (value) async {
+                                      Navigator.of(context).pop();
+                                      await widget.settingsController
+                                          .importBootstrapToken(value);
+                                    },
+                                  ),
+                                );
+                              },
+                              child: const Text('手动导入'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => BootstrapScanScreen(
+                                      onScanned: (value) async {
+                                        await widget.settingsController
+                                            .importBootstrapToken(value);
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: const Text('扫码导入'),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
