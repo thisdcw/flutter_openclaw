@@ -145,6 +145,15 @@ class SecureAuthRepository implements AuthRepository {
 
   @override
   Future<void> saveBootstrapToken(BootstrapTokenState state) {
+    openClawLog(
+      'SecureAuthRepository',
+      'save bootstrap token',
+      fields: <String, Object?>{
+        'bootstrapToken': redactValue(state.token),
+        'gatewayUrl': state.gatewayUrl,
+        'expiresAt': state.expiresAt,
+      },
+    );
     return _storage.write(
       key: _bootstrapTokenKey,
       value: jsonEncode(state.toJson()),
@@ -153,6 +162,7 @@ class SecureAuthRepository implements AuthRepository {
 
   @override
   Future<void> clearBootstrapToken() {
+    openClawLog('SecureAuthRepository', 'clear bootstrap token');
     return _storage.delete(key: _bootstrapTokenKey);
   }
 }

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'openclaw_logger.dart';
+
 class BootstrapPayload {
   final String gatewayUrl;
   final String bootstrapToken;
@@ -26,7 +28,15 @@ class BootstrapPayloadParser {
         throw const FormatException('missing url or bootstrapToken');
       }
       return BootstrapPayload(gatewayUrl: url, bootstrapToken: token);
-    } catch (_) {
+    } catch (error) {
+      openClawLog(
+        'BootstrapPayloadParser',
+        'fallback to raw bootstrap token after parse failure',
+        fields: <String, Object?>{
+          'error': error,
+          'preview': truncateForLog(trimmed, maxLength: 80),
+        },
+      );
       return BootstrapPayload(gatewayUrl: '', bootstrapToken: trimmed);
     }
   }
