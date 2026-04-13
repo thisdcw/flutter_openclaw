@@ -33,8 +33,8 @@ class BootstrapPayloadParser {
         'BootstrapPayloadParser',
         'fallback to raw bootstrap token after parse failure',
         fields: <String, Object?>{
-          'error': error,
-          'preview': truncateForLog(trimmed, maxLength: 80),
+          'error': error.toString(),
+          'preview': '<redacted>',
         },
       );
       return BootstrapPayload(gatewayUrl: '', bootstrapToken: trimmed);
