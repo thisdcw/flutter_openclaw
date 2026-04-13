@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../../domain/models/bootstrap_token_state.dart';
 import '../../domain/models/connection_status.dart';
 import '../../domain/models/device_identity.dart';
 import '../../domain/models/gateway_config.dart';
@@ -92,6 +93,7 @@ class TestConnectionUseCase {
     }
 
     final operatorAuth = await _authRepository.loadOperatorAuth();
+    final bootstrapToken = await _authRepository.loadBootstrapToken();
     openClawLog(
       'TestConnection',
       'operator auth snapshot',
@@ -101,6 +103,38 @@ class TestConnectionUseCase {
         'scopes': operatorAuth?.scopes.join(',') ?? '(none)',
       },
     );
+    openClawLog(
+      'TestConnection',
+      'bootstrap token snapshot',
+      fields: <String, Object?>{
+        'hasBootstrapToken': bootstrapToken != null,
+        'bootstrapExpired': bootstrapToken?.isExpired ?? false,
+        'gatewayUrl': bootstrapToken?.gatewayUrl ?? '(none)',
+      },
+    );
+    final trimmedDeviceToken = (operatorAuth?.deviceToken ?? '').trim();
+    final hasDeviceToken = trimmedDeviceToken.isNotEmpty;
+    final hasUsableBootstrapToken = !hasDeviceToken &&
+        bootstrapToken != null &&
+        !bootstrapToken.isExpired;
+    if (!hasDeviceToken && !hasUsableBootstrapToken) {
+      openClawLog(
+        'TestConnection',
+        'missing auth credentials',
+        fields: <String, Object?>{
+          'hasDeviceToken': hasDeviceToken,
+          'hasBootstrapToken': bootstrapToken != null,
+          'bootstrapExpired': bootstrapToken?.isExpired ?? false,
+        },
+      );
+      throw StateError(
+        '缺少可用的设备令牌或配对码，请导入配对码后再试。',
+      );
+    }
+    final usingBootstrapToken = !hasDeviceToken && hasUsableBootstrapToken;
+    final selectedAuthToken = usingBootstrapToken ? bootstrapToken!.token : '';
+    final selectedDeviceToken = usingBootstrapToken ? '' : trimmedDeviceToken;
+    final scopesForConnect = operatorAuth?.scopes ?? const [];
     final channel = (_channelFactory ?? WebSocketChannel.connect)(
       Uri.parse(config.gatewayUrl),
     );
@@ -127,9 +161,9 @@ class TestConnectionUseCase {
       final connectParams = await _signer.buildConnectParams(
         challenge: challengeModel,
         identity: deviceIdentity,
-        authToken: '',
-        deviceToken: operatorAuth?.deviceToken ?? '',
-        scopes: operatorAuth?.scopes ?? const [],
+        authToken: selectedAuthToken,
+        deviceToken: selectedDeviceToken,
+        scopes: scopesForConnect,
         locale: config.locale,
       );
       final requestId = 'auth-${_uuid.v4()}';
@@ -137,14 +171,13 @@ class TestConnectionUseCase {
         'TestConnection',
         'sending connect',
         fields: <String, Object?>{
-      'requestId': requestId,
-      'authMode': connectParams.auth.usesDeviceToken
-          ? 'deviceToken'
-          : 'token',
-      'deviceToken': redactValue(connectParams.auth.deviceToken ?? ''),
-      'clientMode': connectParams.client.mode,
-      'deviceId': connectParams.device.id,
-      'scopes': connectParams.scopes.join(','),
+          'requestId': requestId,
+          'authSource': usingBootstrapToken ? 'bootstrapToken' : 'deviceToken',
+          'authMode': connectParams.auth.usesDeviceToken ? 'deviceToken' : 'token',
+          'deviceToken': redactValue(connectParams.auth.deviceToken ?? ''),
+          'clientMode': connectParams.client.mode,
+          'deviceId': connectParams.device.id,
+          'scopes': connectParams.scopes.join(','),
         },
       );
 
@@ -211,8 +244,19 @@ class TestConnectionUseCase {
         fields: <String, Object?>{
           'deviceId': deviceIdentity.id,
           'grantedScopes': nextAuth?.scopes.join(',') ?? '(none)',
+          'usedBootstrapToken': usingBootstrapToken,
         },
       );
+      if (bootstrapToken != null && bootstrapToken.isExpired) {
+        await _authRepository.clearBootstrapToken();
+        openClawLog(
+          'TestConnection',
+          'cleared expired bootstrap token',
+          fields: <String, Object?>{
+            'gatewayUrl': bootstrapToken.gatewayUrl,
+          },
+        );
+      }
 
       return AuthenticatedGatewaySession(
         client: client,
