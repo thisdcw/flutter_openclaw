@@ -37,29 +37,37 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             KEYSTORE_CHANNEL,
         ).setMethodCallHandler { call, result ->
-            when (call.method) {
-                "ensureKeypair" -> {
-                    val publicKey = keystoreSigner.ensureKeypair()
-                    result.success(KeystoreSigner.base64(publicKey))
+            runCatching {
+                when (call.method) {
+                    "ensureKeypair" -> {
+                        val publicKey = keystoreSigner.ensureKeypair()
+                        result.success(KeystoreSigner.base64(publicKey))
+                    }
+                    "signPayload" -> {
+                        val payload = call.argument<String>("payload")
+                        if (payload.isNullOrEmpty()) {
+                            result.error(
+                                "missing-payload",
+                                "Payload is required for signing.",
+                                null,
+                            )
+                            return@setMethodCallHandler
+                        }
+                        val signature = keystoreSigner.sign(payload.toByteArray(Charsets.UTF_8))
+                        result.success(KeystoreSigner.base64Url(signature))
+                    }
+                    "clearKeypair" -> {
+                        keystoreSigner.clear()
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
                 }
-            "signPayload" -> {
-                val payload = call.argument<String>("payload")
-                if (payload.isNullOrEmpty()) {
-                    result.error(
-                        "missing-payload",
-                        "Payload is required for signing.",
-                        null,
-                    )
-                    return@setMethodCallHandler
-                }
-                val signature = keystoreSigner.sign(payload.toByteArray(Charsets.UTF_8))
-                result.success(KeystoreSigner.base64Url(signature))
-            }
-                "clearKeypair" -> {
-                    keystoreSigner.clear()
-                    result.success(true)
-                }
-                else -> result.notImplemented()
+            }.onFailure { error ->
+                result.error(
+                    "keystore-error",
+                    error.message ?: "Keystore operation failed.",
+                    null,
+                )
             }
         }
     }

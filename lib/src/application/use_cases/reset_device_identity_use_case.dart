@@ -5,7 +5,7 @@ class ResetDeviceIdentityUseCase {
   ResetDeviceIdentityUseCase(
     this._authRepository, {
     KeystoreSigner? keystore,
-  }) : _keystore = keystore ?? const KeystoreSigner();
+  }) : _keystore = keystore ?? KeystoreSigner();
 
   final AuthRepository _authRepository;
   final KeystoreSigner _keystore;

@@ -49,7 +49,7 @@ class AppDependencies {
     final chatStoreSnapshot = await chatConversationStore.bootstrap();
     final authRepository = SecureAuthRepository();
     final parser = const GatewayProtocolParser();
-    final keystoreSigner = const KeystoreSigner();
+    final keystoreSigner = KeystoreSigner();
     final signer = ConnectSigner(keystoreSigner: keystoreSigner);
     final identityService = DeviceIdentityService();
     final bootstrap = BootstrapAppUseCase(
@@ -86,6 +86,7 @@ class AppDependencies {
       initialConfig: initialConfig,
       initialLocalePreference: initialLocalePreference,
       configRepository: configRepository,
+      authRepository: authRepository,
       appLocalePreferenceRepository: appLocalePreferenceRepository,
       clearOperatorAuthUseCase: clearOperatorAuthUseCase,
       importBootstrapTokenUseCase: importBootstrapTokenUseCase,
@@ -94,8 +95,7 @@ class AppDependencies {
     final connectionController = ConnectionController(
       initialStatus: ConnectionStatus(
         phase: ConnectionPhase.idle,
-        grantedScopes:
-            bootstrapResult.operatorAuth?.scopes ?? const <String>[],
+        grantedScopes: bootstrapResult.operatorAuth?.scopes ?? const <String>[],
         deviceId: bootstrapResult.deviceIdentity.id,
       ),
       testConnectionUseCase: testConnectionUseCase,

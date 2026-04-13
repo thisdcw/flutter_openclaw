@@ -1,8 +1,11 @@
 import 'package:flutter/foundation.dart';
 
 import '../../domain/models/app_locale_preference.dart';
+import '../../domain/models/bootstrap_token_state.dart';
 import '../../domain/models/gateway_config.dart';
+import '../../domain/models/operator_auth_state.dart';
 import '../../domain/repositories/app_locale_preference_repository.dart';
+import '../../domain/repositories/auth_repository.dart';
 import '../../domain/repositories/config_repository.dart';
 import '../../infrastructure/config/dev_defaults.dart';
 import '../../infrastructure/util/openclaw_logger.dart';
@@ -16,6 +19,7 @@ class SettingsController extends ChangeNotifier {
     AppLocalePreference initialLocalePreference =
         AppLocalePreference.system,
     ConfigRepository? configRepository,
+    AuthRepository? authRepository,
     AppLocalePreferenceRepository? appLocalePreferenceRepository,
     ClearOperatorAuthUseCase? clearOperatorAuthUseCase,
     ImportBootstrapTokenUseCase? importBootstrapTokenUseCase,
@@ -24,6 +28,7 @@ class SettingsController extends ChangeNotifier {
   })  : _config = initialConfig ?? defaultGatewayConfig,
         _localePreference = initialLocalePreference,
         _configRepository = configRepository,
+        _authRepository = authRepository,
         _appLocalePreferenceRepository = appLocalePreferenceRepository,
         _clearOperatorAuthUseCase = clearOperatorAuthUseCase,
         _importBootstrapTokenUseCase = importBootstrapTokenUseCase,
@@ -41,14 +46,19 @@ class SettingsController extends ChangeNotifier {
   GatewayConfig _config;
   AppLocalePreference _localePreference;
   final ConfigRepository? _configRepository;
+  final AuthRepository? _authRepository;
   final AppLocalePreferenceRepository? _appLocalePreferenceRepository;
   final ClearOperatorAuthUseCase? _clearOperatorAuthUseCase;
   final ImportBootstrapTokenUseCase? _importBootstrapTokenUseCase;
   final ResetDeviceIdentityUseCase? _resetDeviceIdentityUseCase;
   final bool _isStub;
+  OperatorAuthState? _operatorAuth;
+  BootstrapTokenState? _bootstrapToken;
 
   GatewayConfig get config => _config;
   AppLocalePreference get localePreference => _localePreference;
+  String get deviceToken => _operatorAuth?.deviceToken ?? '';
+  String get bootstrapToken => _bootstrapToken?.token ?? '';
 
   bool get isStub => _isStub;
 
@@ -95,6 +105,7 @@ class SettingsController extends ChangeNotifier {
   Future<void> clearDeviceToken() async {
     openClawLog('SettingsController', 'clear device token');
     await _clearOperatorAuthUseCase?.call();
+    await refreshSecuritySnapshot(notify: false);
     notifyListeners();
   }
 
@@ -102,12 +113,39 @@ class SettingsController extends ChangeNotifier {
     openClawLog('SettingsController', 'reset device identity');
     await _resetDeviceIdentityUseCase?.call();
     await _clearOperatorAuthUseCase?.call();
+    await refreshSecuritySnapshot(notify: false);
     notifyListeners();
   }
 
   Future<void> importBootstrapToken(String input) async {
     await _importBootstrapTokenUseCase?.call(input);
+    final persistedConfig = await _configRepository?.load();
+    if (persistedConfig != null) {
+      _config = persistedConfig;
+    }
+    await refreshSecuritySnapshot(notify: false);
     notifyListeners();
+  }
+
+  Future<void> refreshSecuritySnapshot({bool notify = true}) async {
+    final authRepository = _authRepository;
+    if (authRepository == null) {
+      _operatorAuth = null;
+      _bootstrapToken = null;
+      if (notify) {
+        notifyListeners();
+      }
+      return;
+    }
+
+    final operatorAuth = await authRepository.loadOperatorAuth();
+    final bootstrapToken = await authRepository.loadBootstrapToken();
+    _operatorAuth = operatorAuth;
+    _bootstrapToken =
+        bootstrapToken != null && !bootstrapToken.isExpired ? bootstrapToken : null;
+    if (notify) {
+      notifyListeners();
+    }
   }
 
   Future<void> syncActiveSessionId(String sessionId) async {

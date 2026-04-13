@@ -12,8 +12,8 @@ class ConnectSigner {
   static const String _deviceFamily = 'cli';
   static const String _appVersion = '1.1.0';
 
-  const ConnectSigner({KeystoreSigner? keystoreSigner})
-      : _keystoreSigner = keystoreSigner ?? const KeystoreSigner();
+  ConnectSigner({KeystoreSigner? keystoreSigner})
+      : _keystoreSigner = keystoreSigner ?? KeystoreSigner();
 
   final KeystoreSigner _keystoreSigner;
 

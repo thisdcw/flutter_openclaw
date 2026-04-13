@@ -7,6 +7,7 @@ import '../../domain/models/bootstrap_token_state.dart';
 import '../../domain/models/connection_status.dart';
 import '../../domain/models/device_identity.dart';
 import '../../domain/models/gateway_config.dart';
+import '../../domain/models/gateway_failure.dart';
 import '../../domain/models/operator_auth_state.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../infrastructure/crypto/connect_signer.dart';
@@ -42,7 +43,7 @@ class TestConnectionUseCase {
     Uuid? uuid,
   })  : _authRepository = authRepository,
         _identityService = identityService,
-        _signer = signer ?? const ConnectSigner(),
+        _signer = signer ?? ConnectSigner(),
         _parser = parser ?? const GatewayProtocolParser(),
         _channelFactory = channelFactory,
         _uuid = uuid ?? const Uuid();
@@ -214,6 +215,20 @@ class TestConnectionUseCase {
 
       final failure = _parser.extractFailure(response);
       if (failure != null) {
+        if (usingBootstrapToken && _isBootstrapTokenMismatch(failure)) {
+          openClawLog(
+            'TestConnection',
+            'bootstrap token rejected by gateway but kept locally',
+            fields: <String, Object?>{
+              'code': failure.code,
+              'reason': failure.reason,
+            },
+          );
+          throw StateError(
+            '当前导入的不是有效的配对码/bootstrapToken，或该配对码已失效。'
+            '请让管理员重新生成配对二维码/配对码后再导入，不要直接填共享 gateway token。',
+          );
+        }
         openClawLog(
           'TestConnection',
           'auth failed',
@@ -281,4 +296,11 @@ class TestConnectionUseCase {
     }
   }
 
+  bool _isBootstrapTokenMismatch(GatewayFailure failure) {
+    final code = failure.code.toLowerCase();
+    final reason = failure.reason.toLowerCase();
+    return reason.contains('gateway token mismatch') ||
+        reason.contains('provide gateway auth token') ||
+        code.contains('auth') && reason.contains('token mismatch');
+  }
 }

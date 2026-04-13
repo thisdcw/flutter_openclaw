@@ -38,14 +38,19 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get gatewayConfigurationSubtitle =>
       'Gateway 会话详情由客户端管理，这里仅作展示。需要时可以直接在聊天页重试连接。';
+
   @override
   String get pairingTitle => '配对管理';
+
   @override
   String get pairingImportManual => '手动导入';
+
   @override
   String get pairingImportScan => '扫码导入';
+
   @override
   String get pairingExpired => '配对码已过期，请重新导入。';
+
   @override
   String get pairingMissing => '请先导入配对码。';
 

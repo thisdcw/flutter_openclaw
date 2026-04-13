@@ -40,14 +40,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get gatewayConfigurationSubtitle =>
       'Gateway session details are managed by the client and shown here for reference. Connection can be retried directly from the chat page when needed.';
+
   @override
   String get pairingTitle => 'Pairing';
+
   @override
   String get pairingImportManual => 'Manual Import';
+
   @override
   String get pairingImportScan => 'Scan QR';
+
   @override
   String get pairingExpired => 'Pairing code expired. Please import again.';
+
   @override
   String get pairingMissing => 'Please import a pairing code first.';
 

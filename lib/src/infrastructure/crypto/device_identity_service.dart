@@ -10,7 +10,7 @@ class DeviceIdentityService {
     HashAlgorithm? hasher,
     KeystoreSigner? keystoreSigner,
   })  : _hasher = hasher ?? Sha256(),
-        _keystoreSigner = keystoreSigner ?? const KeystoreSigner();
+        _keystoreSigner = keystoreSigner ?? KeystoreSigner();
 
   final HashAlgorithm _hasher;
   final KeystoreSigner _keystoreSigner;

@@ -13,7 +13,7 @@ class KeystoreSigner(private val alias: String) {
     fun ensureKeypair(): ByteArray {
         if (!keystore.containsAlias(alias)) {
             val generator = KeyPairGenerator.getInstance(
-                KeyProperties.KEY_ALGORITHM_ED25519,
+                ED25519_ALGORITHM,
                 ANDROID_KEYSTORE,
             )
             val spec = KeyGenParameterSpec.Builder(
@@ -30,7 +30,7 @@ class KeystoreSigner(private val alias: String) {
 
     fun sign(payload: ByteArray): ByteArray {
         val entry = keystore.getEntry(alias, null) as KeyStore.PrivateKeyEntry
-        val signature = Signature.getInstance("Ed25519")
+        val signature = Signature.getInstance(ED25519_ALGORITHM)
         signature.initSign(entry.privateKey)
         signature.update(payload)
         return signature.sign()
@@ -59,6 +59,7 @@ class KeystoreSigner(private val alias: String) {
 
     companion object {
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
+        private const val ED25519_ALGORITHM = "Ed25519"
 
         fun base64(bytes: ByteArray): String = Base64.encodeToString(bytes, Base64.NO_WRAP)
 
