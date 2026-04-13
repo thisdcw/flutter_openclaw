@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../domain/models/bootstrap_token_state.dart';
 import '../../domain/models/device_identity.dart';
 import '../../domain/models/operator_auth_state.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -20,6 +21,7 @@ class SecureAuthRepository implements AuthRepository {
 
   static const String _deviceIdentityKey = 'openclaw.device_identity';
   static const String _operatorAuthStateKey = 'openclaw.operator_auth_state';
+  static const String _bootstrapTokenKey = 'openclaw.bootstrap_token';
 
   final _SecureStorage _storage;
 
@@ -82,6 +84,20 @@ class SecureAuthRepository implements AuthRepository {
     return auth;
   }
 
+  @override
+  Future<BootstrapTokenState?> loadBootstrapToken() async {
+    final payload = await _storage.read(key: _bootstrapTokenKey);
+    if (payload == null || payload.trim().isEmpty) {
+      openClawLog('SecureAuthRepository', 'load bootstrap token: empty');
+      return null;
+    }
+    final decoded = _decodeStoredJsonObject(
+      payload,
+      valueName: 'bootstrap token',
+    );
+    return BootstrapTokenState.fromJson(decoded);
+  }
+
   static Map<String, dynamic> _decodeStoredJsonObject(
     String payload, {
     required String valueName,
@@ -125,6 +141,19 @@ class SecureAuthRepository implements AuthRepository {
       key: _operatorAuthStateKey,
       value: jsonEncode(state.toJson()),
     );
+  }
+
+  @override
+  Future<void> saveBootstrapToken(BootstrapTokenState state) {
+    return _storage.write(
+      key: _bootstrapTokenKey,
+      value: jsonEncode(state.toJson()),
+    );
+  }
+
+  @override
+  Future<void> clearBootstrapToken() {
+    return _storage.delete(key: _bootstrapTokenKey);
   }
 }
 

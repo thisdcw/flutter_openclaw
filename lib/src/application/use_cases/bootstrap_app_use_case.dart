@@ -1,3 +1,4 @@
+import '../../domain/models/bootstrap_token_state.dart';
 import '../../domain/models/device_identity.dart';
 import '../../domain/models/gateway_config.dart';
 import '../../domain/models/operator_auth_state.dart';
@@ -33,6 +34,10 @@ class BootstrapAppUseCase {
     final config = await _configRepository.load();
     final existingIdentity = await _authRepository.loadDeviceIdentity();
     final identity = existingIdentity ?? await _identityService.create();
+    final bootstrapToken = await _authRepository.loadBootstrapToken();
+    if (bootstrapToken != null && bootstrapToken.isExpired) {
+      await _authRepository.clearBootstrapToken();
+    }
     openClawLog(
       'Bootstrap',
       'config and identity loaded',
