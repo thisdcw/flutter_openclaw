@@ -11,6 +11,7 @@ import '../../application/controllers/chat_controller.dart';
 import '../../application/controllers/connection_controller.dart';
 import '../../application/controllers/settings_controller.dart';
 import '../../domain/models/chat_draft.dart';
+import '../../domain/models/chat_message.dart';
 import '../../domain/models/connection_status.dart';
 import '../../domain/models/gateway_failure.dart';
 import '../../domain/models/selected_image_attachment.dart';
@@ -43,9 +44,14 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   late final TextEditingController composerController;
   late final FocusNode composerFocusNode;
+  late final ScrollController messageScrollController;
   late final ImagePicker imagePicker;
   final List<SelectedImageAttachment> pendingAttachments = [];
   final Uuid uuid = Uuid();
+  String? lastObservedConversationId;
+  String lastObservedMessageSignature = '';
+  bool autoScrollScheduled = false;
+  bool pendingForceScroll = false;
 
   @override
   void initState() {
@@ -53,6 +59,7 @@ class _ChatScreenState extends State<ChatScreen> {
     composerController = TextEditingController();
     composerController.addListener(_handleComposerChange);
     composerFocusNode = FocusNode();
+    messageScrollController = ScrollController();
     imagePicker = ImagePicker();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(widget.connectionController.connectIfNeeded());
@@ -64,6 +71,7 @@ class _ChatScreenState extends State<ChatScreen> {
     composerController.removeListener(_handleComposerChange);
     composerController.dispose();
     composerFocusNode.dispose();
+    messageScrollController.dispose();
     super.dispose();
   }
 
@@ -104,6 +112,10 @@ class _ChatScreenState extends State<ChatScreen> {
           l10n,
           connectionStatus,
           isConnecting,
+        );
+        _syncMessageViewport(
+          conversationId: activeConversation?.id,
+          messages: messages,
         );
 
         return Scaffold(
@@ -221,6 +233,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 onSelectCommand: _applyCommandTemplate,
                               )
                             : ListView.separated(
+                                controller: messageScrollController,
                                 padding: EdgeInsets.zero,
                                 itemCount: messages.length,
                                 separatorBuilder: (_, __) =>
@@ -425,6 +438,82 @@ class _ChatScreenState extends State<ChatScreen> {
       rawMessage: message,
       code: 'PICKER_ERROR',
     );
+  }
+
+  void _syncMessageViewport({
+    required String? conversationId,
+    required List<ChatMessage> messages,
+  }) {
+    final signature = _messageSignature(messages);
+    final conversationChanged = conversationId != lastObservedConversationId;
+    final messageChanged = signature != lastObservedMessageSignature;
+    if (!conversationChanged && !messageChanged) {
+      return;
+    }
+
+    lastObservedConversationId = conversationId;
+    lastObservedMessageSignature = signature;
+
+    final shouldForceScroll = conversationChanged;
+    final shouldAutoScroll =
+        shouldForceScroll || (messageChanged && _isNearLatestMessage());
+    if (!shouldAutoScroll) {
+      return;
+    }
+
+    _scheduleScrollToLatest(force: shouldForceScroll);
+  }
+
+  void _scheduleScrollToLatest({required bool force}) {
+    pendingForceScroll = pendingForceScroll || force;
+    if (autoScrollScheduled) {
+      return;
+    }
+    autoScrollScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      autoScrollScheduled = false;
+      final shouldForceScroll = pendingForceScroll;
+      pendingForceScroll = false;
+      _scrollToLatest(force: shouldForceScroll);
+    });
+  }
+
+  void _scrollToLatest({required bool force}) {
+    if (!messageScrollController.hasClients) {
+      return;
+    }
+    final targetOffset = messageScrollController.position.maxScrollExtent;
+    if (force) {
+      messageScrollController.jumpTo(targetOffset);
+      return;
+    }
+    messageScrollController.animateTo(
+      targetOffset,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  bool _isNearLatestMessage() {
+    if (!messageScrollController.hasClients) {
+      return true;
+    }
+    final position = messageScrollController.position;
+    final distanceToBottom = position.maxScrollExtent - position.pixels;
+    return distanceToBottom <= 120;
+  }
+
+  String _messageSignature(List<ChatMessage> messages) {
+    if (messages.isEmpty) {
+      return 'empty';
+    }
+    final lastMessage = messages.last;
+    return [
+      messages.length,
+      lastMessage.id,
+      lastMessage.text.length,
+      lastMessage.isStreaming,
+    ].join('|');
   }
 
   static String _inferMimeType(String fileName) {
