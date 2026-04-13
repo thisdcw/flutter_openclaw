@@ -158,6 +158,36 @@ abstract class AppLocalizations {
   /// **'Gateway session details are managed by the client and shown here for reference. Connection can be retried directly from the chat page when needed.'**
   String get gatewayConfigurationSubtitle;
 
+  /// No description provided for @pairingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairing'**
+  String get pairingTitle;
+
+  /// No description provided for @pairingImportManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual Import'**
+  String get pairingImportManual;
+
+  /// No description provided for @pairingImportScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR'**
+  String get pairingImportScan;
+
+  /// No description provided for @pairingExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairing code expired. Please import again.'**
+  String get pairingExpired;
+
+  /// No description provided for @pairingMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Please import a pairing code first.'**
+  String get pairingMissing;
+
   /// No description provided for @connectionOverviewTitle.
   ///
   /// In en, this message translates to:

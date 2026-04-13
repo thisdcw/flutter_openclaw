@@ -137,14 +137,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '配对管理',
+                        l10n.pairingTitle,
                         style: theme.textTheme.titleLarge,
                       ),
                       const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
-                            child: ElevatedButton(
+                              child: ElevatedButton(
                               onPressed: () {
                                 showModalBottomSheet(
                                   context: context,
@@ -158,7 +158,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ),
                                 );
                               },
-                              child: const Text('手动导入'),
+                              child: Text(l10n.pairingImportManual),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -176,7 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ),
                                 );
                               },
-                              child: const Text('扫码导入'),
+                              child: Text(l10n.pairingImportScan),
                             ),
                           ),
                         ],
