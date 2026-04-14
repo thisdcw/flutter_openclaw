@@ -25,7 +25,7 @@ class SettingsController extends ChangeNotifier {
     ImportBootstrapTokenUseCase? importBootstrapTokenUseCase,
     ResetDeviceIdentityUseCase? resetDeviceIdentityUseCase,
     bool isStub = false,
-  })  : _config = _normalizeGateway(initialConfig ?? defaultGatewayConfig),
+  })  : _config = initialConfig ?? defaultGatewayConfig,
         _localePreference = initialLocalePreference,
         _configRepository = configRepository,
         _authRepository = authRepository,
@@ -62,43 +62,34 @@ class SettingsController extends ChangeNotifier {
 
   bool get isStub => _isStub;
 
-  static GatewayConfig _normalizeGateway(GatewayConfig config) {
-    if (config.gatewayUrl == defaultGatewayConfig.gatewayUrl) {
-      return config;
-    }
-    return config.copyWith(gatewayUrl: defaultGatewayConfig.gatewayUrl);
-  }
-
   void update(GatewayConfig next) {
-    final normalized = _normalizeGateway(next);
     openClawLog(
       'SettingsController',
       'update in-memory config',
       fields: <String, Object?>{
-        'gatewayUrl': normalized.gatewayUrl,
-        'sessionId': normalized.sessionId,
-        'timeoutMs': normalized.timeoutMs,
-        'locale': normalized.locale,
+        'gatewayUrl': next.gatewayUrl,
+        'sessionId': next.sessionId,
+        'timeoutMs': next.timeoutMs,
+        'locale': next.locale,
       },
     );
-    _config = normalized;
+    _config = next;
     notifyListeners();
   }
 
   Future<void> save(GatewayConfig next) async {
-    final normalized = _normalizeGateway(next);
     openClawLog(
       'SettingsController',
       'save config',
       fields: <String, Object?>{
-        'gatewayUrl': normalized.gatewayUrl,
-        'sessionId': normalized.sessionId,
-        'timeoutMs': normalized.timeoutMs,
-        'locale': normalized.locale,
+        'gatewayUrl': next.gatewayUrl,
+        'sessionId': next.sessionId,
+        'timeoutMs': next.timeoutMs,
+        'locale': next.locale,
       },
     );
-    _config = normalized;
-    await _configRepository?.save(normalized);
+    _config = next;
+    await _configRepository?.save(next);
     notifyListeners();
   }
 
@@ -130,7 +121,7 @@ class SettingsController extends ChangeNotifier {
     await _importBootstrapTokenUseCase?.call(input);
     final persistedConfig = await _configRepository?.load();
     if (persistedConfig != null) {
-      _config = _normalizeGateway(persistedConfig);
+      _config = persistedConfig;
     }
     await refreshSecuritySnapshot(notify: false);
     notifyListeners();
@@ -161,7 +152,7 @@ class SettingsController extends ChangeNotifier {
     if (_config.sessionId == sessionId) {
       return;
     }
-    final next = _normalizeGateway(_config.copyWith(sessionId: sessionId));
+    final next = _config.copyWith(sessionId: sessionId);
     _config = next;
     await _configRepository?.save(next);
     notifyListeners();

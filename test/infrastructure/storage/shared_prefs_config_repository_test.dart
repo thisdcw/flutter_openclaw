@@ -4,13 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter_openclaw/src/domain/models/gateway_config.dart';
-import 'package:flutter_openclaw/src/infrastructure/config/dev_defaults.dart';
 import 'package:flutter_openclaw/src/infrastructure/storage/shared_prefs_config_repository.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('save normalizes gatewayUrl to default', () async {
+  test('save stores gatewayUrl as-is', () async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final repository = SharedPrefsConfigRepository(prefs);
@@ -28,13 +27,13 @@ void main() {
     expect(stored, isNotNull);
 
     final payload = jsonDecode(stored!) as Map<String, dynamic>;
-    expect(payload['gatewayUrl'], defaultGatewayConfig.gatewayUrl);
+    expect(payload['gatewayUrl'], config.gatewayUrl);
     expect(payload['sessionId'], config.sessionId);
     expect(payload['timeoutMs'], config.timeoutMs);
     expect(payload['locale'], config.locale);
   });
 
-  test('load normalizes gatewayUrl to default', () async {
+  test('load returns gatewayUrl as-is', () async {
     const storedConfig = <String, Object?>{
       'gatewayUrl': 'wss://example.invalid/other',
       'sessionId': 'session-456',
@@ -51,7 +50,7 @@ void main() {
 
     final config = await repository.load();
 
-    expect(config.gatewayUrl, defaultGatewayConfig.gatewayUrl);
+    expect(config.gatewayUrl, storedConfig['gatewayUrl']);
     expect(config.sessionId, storedConfig['sessionId']);
     expect(config.timeoutMs, storedConfig['timeoutMs']);
     expect(config.locale, storedConfig['locale']);

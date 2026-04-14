@@ -20,13 +20,6 @@ class SharedPrefsConfigRepository implements ConfigRepository {
     return SharedPrefsConfigRepository(prefs);
   }
 
-  GatewayConfig _normalizeGateway(GatewayConfig config) {
-    if (config.gatewayUrl == defaultGatewayConfig.gatewayUrl) {
-      return config;
-    }
-    return config.copyWith(gatewayUrl: defaultGatewayConfig.gatewayUrl);
-  }
-
   @override
   Future<GatewayConfig> load() async {
     final jsonString = _prefs.getString(_storageKey);
@@ -38,7 +31,7 @@ class SharedPrefsConfigRepository implements ConfigRepository {
     try {
       final map = jsonDecode(jsonString) as Map<String, dynamic>;
       map.remove('authToken');
-      final config = _normalizeGateway(GatewayConfig.fromJson(map));
+      final config = GatewayConfig.fromJson(map);
       openClawLog(
         'ConfigRepository',
         'load persisted config',
@@ -64,16 +57,15 @@ class SharedPrefsConfigRepository implements ConfigRepository {
 
   @override
   Future<void> save(GatewayConfig config) async {
-    final normalized = _normalizeGateway(config);
-    final encoded = jsonEncode(normalized.toJson());
+    final encoded = jsonEncode(config.toJson());
     openClawLog(
       'ConfigRepository',
       'save config',
       fields: <String, Object?>{
-        'gatewayUrl': normalized.gatewayUrl,
-        'sessionId': normalized.sessionId,
-        'timeoutMs': normalized.timeoutMs,
-        'locale': normalized.locale,
+        'gatewayUrl': config.gatewayUrl,
+        'sessionId': config.sessionId,
+        'timeoutMs': config.timeoutMs,
+        'locale': config.locale,
       },
     );
     await _prefs.setString(_storageKey, encoded);
