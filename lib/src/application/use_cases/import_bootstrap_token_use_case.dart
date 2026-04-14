@@ -1,7 +1,6 @@
 import '../../domain/models/bootstrap_token_state.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/repositories/config_repository.dart';
-import '../../infrastructure/config/dev_defaults.dart';
 import '../../infrastructure/util/bootstrap_payload_parser.dart';
 
 class ImportBootstrapTokenUseCase {
@@ -17,18 +16,30 @@ class ImportBootstrapTokenUseCase {
 
   Future<BootstrapTokenState> call(String input, {int ttlMinutes = 10}) async {
     final payload = _parser.parse(input);
-    final fixedGatewayUrl = defaultGatewayConfig.gatewayUrl;
+    _guardAgainstClawGateway(payload.gatewayUrl);
     final now = DateTime.now().millisecondsSinceEpoch;
     final state = BootstrapTokenState(
       token: payload.bootstrapToken,
-      gatewayUrl: fixedGatewayUrl,
+      gatewayUrl: payload.gatewayUrl,
       importedAt: now,
       expiresAt: now + ttlMinutes * 60 * 1000,
     );
     await _authRepository.saveBootstrapToken(state);
     final config = await _configRepository.load();
-    final next = config.copyWith(gatewayUrl: fixedGatewayUrl);
+    final next = config.copyWith(gatewayUrl: payload.gatewayUrl);
     await _configRepository.save(next);
     return state;
+  }
+
+  void _guardAgainstClawGateway(String gatewayUrl) {
+    if (gatewayUrl.trim().isEmpty) {
+      return;
+    }
+    final normalized = gatewayUrl.trim();
+    if (normalized.toLowerCase().endsWith('/claw')) {
+      throw StateError(
+        '配对码无效：请重新获取配对码（正确地址应为 wss://thisdcw.cn）。',
+      );
+    }
   }
 }

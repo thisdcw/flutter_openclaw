@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'openclaw_logger.dart';
 
 class BootstrapPayload {
+  final String gatewayUrl;
   final String bootstrapToken;
 
   const BootstrapPayload({
+    required this.gatewayUrl,
     required this.bootstrapToken,
   });
 }
@@ -20,11 +22,13 @@ class BootstrapPayloadParser {
         throw const FormatException('payload must be an object');
       }
       final map = Map<String, dynamic>.from(json);
+      final url = map['url'] ?? map['gatewayUrl'];
       final token = map['bootstrapToken'];
-      if (token is! String) {
-        throw const FormatException('missing bootstrapToken');
+      if (url is! String || token is! String) {
+        throw const FormatException('missing url or bootstrapToken');
       }
       return BootstrapPayload(
+        gatewayUrl: url.trim(),
         bootstrapToken: token.trim(),
       );
     } catch (error) {
@@ -36,7 +40,7 @@ class BootstrapPayloadParser {
           'preview': '<redacted>',
         },
       );
-      return BootstrapPayload(bootstrapToken: trimmed);
+      return BootstrapPayload(gatewayUrl: '', bootstrapToken: trimmed);
     }
   }
 
