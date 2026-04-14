@@ -16,7 +16,7 @@ class ImportBootstrapTokenUseCase {
 
   Future<BootstrapTokenState> call(String input, {int ttlMinutes = 10}) async {
     final payload = _parser.parse(input);
-    _guardAgainstClawGateway(payload.gatewayUrl);
+    _guardAgainstInvalidGateway(payload.gatewayUrl);
     final now = DateTime.now().millisecondsSinceEpoch;
     final state = BootstrapTokenState(
       token: payload.bootstrapToken,
@@ -31,12 +31,30 @@ class ImportBootstrapTokenUseCase {
     return state;
   }
 
-  void _guardAgainstClawGateway(String gatewayUrl) {
-    if (gatewayUrl.trim().isEmpty) {
-      return;
-    }
+  void _guardAgainstInvalidGateway(String gatewayUrl) {
     final normalized = gatewayUrl.trim();
-    if (normalized.toLowerCase().endsWith('/claw')) {
+    if (normalized.isEmpty) {
+      throw StateError(
+        '配对码无效：请重新获取配对码（正确地址应为 wss://thisdcw.cn）。',
+      );
+    }
+
+    final uri = Uri.tryParse(normalized);
+    if (uri != null) {
+      final segments = uri.pathSegments.where((segment) => segment.isNotEmpty);
+      if (segments.isNotEmpty &&
+          segments.last.toLowerCase() == 'claw') {
+        throw StateError(
+          '配对码无效：请重新获取配对码（正确地址应为 wss://thisdcw.cn）。',
+        );
+      }
+    }
+
+    final lower = normalized.toLowerCase();
+    if (lower.endsWith('/claw') ||
+        lower.endsWith('/claw/') ||
+        lower.contains('/claw?') ||
+        lower.contains('/claw#')) {
       throw StateError(
         '配对码无效：请重新获取配对码（正确地址应为 wss://thisdcw.cn）。',
       );

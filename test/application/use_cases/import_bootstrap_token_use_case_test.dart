@@ -44,6 +44,66 @@ void main() {
     );
   });
 
+  test('rejects /claw/ and /claw?x=y gateway url', () async {
+    const payloadWithSlash = <String, Object?>{
+      'url': 'wss://thisdcw.cn/claw/',
+      'bootstrapToken': 'boot',
+    };
+    const payloadWithQuery = <String, Object?>{
+      'url': 'wss://thisdcw.cn/claw?x=y',
+      'bootstrapToken': 'boot',
+    };
+
+    final useCase = ImportBootstrapTokenUseCase(
+      _InMemoryAuthRepository(),
+      _InMemoryConfigRepository(
+        const GatewayConfig(
+          gatewayUrl: 'wss://example.invalid',
+          sessionId: 'session-1',
+          timeoutMs: 1000,
+          locale: 'en-US',
+        ),
+      ),
+      BootstrapPayloadParser(),
+    );
+
+    final encodedSlash = base64Url.encode(
+      utf8.encode(jsonEncode(payloadWithSlash)),
+    );
+    final encodedQuery = base64Url.encode(
+      utf8.encode(jsonEncode(payloadWithQuery)),
+    );
+
+    expect(
+      () => useCase.call(encodedSlash),
+      throwsA(isA<StateError>()),
+    );
+    expect(
+      () => useCase.call(encodedQuery),
+      throwsA(isA<StateError>()),
+    );
+  });
+
+  test('rejects raw bootstrap token without url', () async {
+    final useCase = ImportBootstrapTokenUseCase(
+      _InMemoryAuthRepository(),
+      _InMemoryConfigRepository(
+        const GatewayConfig(
+          gatewayUrl: 'wss://example.invalid',
+          sessionId: 'session-1',
+          timeoutMs: 1000,
+          locale: 'en-US',
+        ),
+      ),
+      BootstrapPayloadParser(),
+    );
+
+    expect(
+      () => useCase.call('raw-bootstrap-token'),
+      throwsA(isA<StateError>()),
+    );
+  });
+
   test('persists gateway url and bootstrap token', () async {
     const payload = <String, Object?>{
       'url': 'wss://example.invalid',
