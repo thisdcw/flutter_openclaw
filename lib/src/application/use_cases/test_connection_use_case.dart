@@ -10,6 +10,7 @@ import '../../domain/models/gateway_config.dart';
 import '../../domain/models/gateway_failure.dart';
 import '../../domain/models/operator_auth_state.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../infrastructure/config/dev_defaults.dart';
 import '../../infrastructure/crypto/connect_signer.dart';
 import '../../infrastructure/crypto/device_identity_service.dart';
 import '../../infrastructure/gateway/gateway_client.dart';
@@ -69,11 +70,12 @@ class TestConnectionUseCase {
   Future<AuthenticatedGatewaySession> connect({
     required GatewayConfig config,
   }) async {
+    final fixedGatewayUrl = defaultGatewayConfig.gatewayUrl;
     openClawLog(
       'TestConnection',
       'connect start',
       fields: <String, Object?>{
-        'gatewayUrl': config.gatewayUrl,
+        'gatewayUrl': fixedGatewayUrl,
         'sessionId': config.sessionId,
         'timeoutMs': config.timeoutMs,
         'locale': config.locale,
@@ -137,7 +139,7 @@ class TestConnectionUseCase {
     final selectedDeviceToken = usingBootstrapToken ? '' : trimmedDeviceToken;
     final scopesForConnect = operatorAuth?.scopes ?? const [];
     final channel = (_channelFactory ?? WebSocketChannel.connect)(
-      Uri.parse(config.gatewayUrl),
+      Uri.parse(fixedGatewayUrl),
     );
     openClawLog('TestConnection', 'websocket channel created');
     final client = GatewayClient(
