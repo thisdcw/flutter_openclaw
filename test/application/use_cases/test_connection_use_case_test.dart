@@ -9,11 +9,10 @@ import 'package:flutter_openclaw/src/domain/models/device_identity.dart';
 import 'package:flutter_openclaw/src/domain/models/gateway_config.dart';
 import 'package:flutter_openclaw/src/domain/models/operator_auth_state.dart';
 import 'package:flutter_openclaw/src/domain/repositories/auth_repository.dart';
-import 'package:flutter_openclaw/src/infrastructure/config/dev_defaults.dart';
 import 'package:flutter_openclaw/src/infrastructure/crypto/device_identity_service.dart';
 
 void main() {
-  test('connect uses default gateway url', () async {
+  test('connect uses config gateway url as-is', () async {
     final capturedUris = <Uri>[];
     const identity = DeviceIdentity(
       id: 'device-123',
@@ -39,7 +38,7 @@ void main() {
     );
 
     const config = GatewayConfig(
-      gatewayUrl: 'wss://example.invalid/gateway',
+      gatewayUrl: 'wss://example.invalid',
       sessionId: 'session-123',
       timeoutMs: 1,
       locale: 'en-US',
@@ -50,7 +49,44 @@ void main() {
     } catch (_) {}
 
     expect(capturedUris, hasLength(1));
-    expect(capturedUris.single.toString(), defaultGatewayConfig.gatewayUrl);
+    expect(capturedUris.single.toString(), config.gatewayUrl);
+  });
+
+  test('connect rejects legacy /claw gateway url', () async {
+    final capturedUris = <Uri>[];
+    const identity = DeviceIdentity(
+      id: 'device-123',
+      publicKey: 'public-key',
+    );
+
+    final authRepository = _FakeAuthRepository(deviceIdentity: identity);
+    final useCase = TestConnectionUseCase(
+      authRepository: authRepository,
+      identityService: _FakeDeviceIdentityService(identity),
+      channelFactory: (uri) {
+        capturedUris.add(uri);
+        return _FakeWebSocketChannel();
+      },
+    );
+
+    const config = GatewayConfig(
+      gatewayUrl: 'wss://example.invalid/claw?x=y',
+      sessionId: 'session-123',
+      timeoutMs: 1,
+      locale: 'en-US',
+    );
+
+    await expectLater(
+      useCase.connect(config: config),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          '检测到旧版本网关地址，请重新导入配对码。',
+        ),
+      ),
+    );
+    expect(capturedUris, isEmpty);
   });
 }
 

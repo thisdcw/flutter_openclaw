@@ -10,7 +10,6 @@ import '../../domain/models/gateway_config.dart';
 import '../../domain/models/gateway_failure.dart';
 import '../../domain/models/operator_auth_state.dart';
 import '../../domain/repositories/auth_repository.dart';
-import '../../infrastructure/config/dev_defaults.dart';
 import '../../infrastructure/crypto/connect_signer.dart';
 import '../../infrastructure/crypto/device_identity_service.dart';
 import '../../infrastructure/gateway/gateway_client.dart';
@@ -70,12 +69,15 @@ class TestConnectionUseCase {
   Future<AuthenticatedGatewaySession> connect({
     required GatewayConfig config,
   }) async {
-    final fixedGatewayUrl = defaultGatewayConfig.gatewayUrl;
+    final gatewayUrl = config.gatewayUrl;
+    if (_isLegacyClawGateway(gatewayUrl)) {
+      throw StateError('检测到旧版本网关地址，请重新导入配对码。');
+    }
     openClawLog(
       'TestConnection',
       'connect start',
       fields: <String, Object?>{
-        'gatewayUrl': fixedGatewayUrl,
+        'gatewayUrl': gatewayUrl,
         'sessionId': config.sessionId,
         'timeoutMs': config.timeoutMs,
         'locale': config.locale,
@@ -139,7 +141,7 @@ class TestConnectionUseCase {
     final selectedDeviceToken = usingBootstrapToken ? '' : trimmedDeviceToken;
     final scopesForConnect = operatorAuth?.scopes ?? const [];
     final channel = (_channelFactory ?? WebSocketChannel.connect)(
-      Uri.parse(fixedGatewayUrl),
+      Uri.parse(gatewayUrl),
     );
     openClawLog('TestConnection', 'websocket channel created');
     final client = GatewayClient(
@@ -243,17 +245,31 @@ class TestConnectionUseCase {
         throw StateError(failure.message);
       }
 
-      final nextAuth = _parser.extractHelloOkAuth(response) ?? operatorAuth;
-      if (nextAuth != null) {
-        await _authRepository.saveOperatorAuth(nextAuth);
+      OperatorAuthState? nextAuth;
+      if (usingBootstrapToken) {
+        final helloAuth = _parser.extractHelloOkAuth(response);
+        if (helloAuth != null) {
+          await _authRepository.saveOperatorAuth(helloAuth);
+          openClawLog(
+            'TestConnection',
+            'persisted operator auth',
+            fields: <String, Object?>{
+              'deviceToken': redactValue(helloAuth.deviceToken),
+              'scopes': helloAuth.scopes.join(','),
+            },
+          );
+        }
+        nextAuth = helloAuth ?? operatorAuth;
+        await _authRepository.clearBootstrapToken();
         openClawLog(
           'TestConnection',
-          'persisted operator auth',
+          'cleared bootstrap token after success',
           fields: <String, Object?>{
-            'deviceToken': redactValue(nextAuth.deviceToken),
-            'scopes': nextAuth.scopes.join(','),
+            'gatewayUrl': bootstrapToken?.gatewayUrl ?? '(none)',
           },
         );
+      } else {
+        nextAuth = operatorAuth;
       }
       openClawLog(
         'TestConnection',
@@ -264,7 +280,9 @@ class TestConnectionUseCase {
           'usedBootstrapToken': usingBootstrapToken,
         },
       );
-      if (bootstrapToken != null && bootstrapToken.isExpired) {
+      if (!usingBootstrapToken &&
+          bootstrapToken != null &&
+          bootstrapToken.isExpired) {
         await _authRepository.clearBootstrapToken();
         openClawLog(
           'TestConnection',
@@ -304,5 +322,12 @@ class TestConnectionUseCase {
     return reason.contains('gateway token mismatch') ||
         reason.contains('provide gateway auth token') ||
         code.contains('auth') && reason.contains('token mismatch');
+  }
+
+  bool _isLegacyClawGateway(String gatewayUrl) {
+    final withoutFragment = gatewayUrl.split('#').first;
+    final withoutQuery = withoutFragment.split('?').first;
+    final normalized = withoutQuery.replaceAll(RegExp(r'/+$'), '');
+    return normalized.endsWith('/claw');
   }
 }
