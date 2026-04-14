@@ -168,6 +168,7 @@ class TestConnectionUseCase {
         identity: deviceIdentity,
         authToken: selectedAuthToken,
         deviceToken: selectedDeviceToken,
+        useBootstrapAuth: usingBootstrapToken,
         scopes: scopesForConnect,
         locale: config.locale,
       );
@@ -178,8 +179,9 @@ class TestConnectionUseCase {
         fields: <String, Object?>{
           'requestId': requestId,
           'authSource': usingBootstrapToken ? 'bootstrapToken' : 'deviceToken',
-          'authMode': connectParams.auth.usesDeviceToken ? 'deviceToken' : 'token',
+          'authMode': connectParams.auth.authMode,
           'deviceToken': redactValue(connectParams.auth.deviceToken ?? ''),
+          'bootstrapToken': redactValue(connectParams.auth.bootstrapToken ?? ''),
           'clientMode': connectParams.client.mode,
           'deviceId': connectParams.device.id,
           'scopes': connectParams.scopes.join(','),

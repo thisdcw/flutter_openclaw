@@ -317,6 +317,140 @@ Gateway Protocol 要求设备在 `connect` 时提供：
 - 这里首次连接用的是 `bootstrapToken`
 - 不是长期共享 `gateway token`
 
+### 7.3.1 `bootstrapToken` 到底是怎么变成 `deviceToken` 的
+
+这里最容易让 AI 或工程师误解。
+
+要点先说清楚：
+
+- **通常不存在一个额外的“exchange bootstrapToken -> deviceToken”的 HTTP API**
+- 这个“换取”动作本身，就发生在**第一次 `connect` 握手**里
+- `bootstrapToken` 的作用是：让 Gateway 接受这次“首次配对请求”
+- `deviceToken` 的作用是：在配对获批后，作为这台设备后续长期重连的正式凭证
+
+也就是说，正确理解不是：
+
+1. 先拿 `bootstrapToken` 调某个接口
+2. 单独换回一个 `deviceToken`
+3. 再拿 `deviceToken` 去连 Gateway
+
+而是：
+
+1. 客户端先用 `bootstrapToken` 发起**第一次** challenge-signed `connect`
+2. Gateway 识别这是“新设备首次配对”
+3. Gateway 记录 pending pairing request
+4. 管理员审批这条 request
+5. **该次连接成功结果**里返回 `hello-ok.auth.deviceToken`
+6. 客户端把这个 `deviceToken` 保存下来
+7. 之后所有正常重连都改用这个 `deviceToken`
+
+一句话总结：
+
+- `bootstrapToken` 不是让你去调用一个隐藏接口“换票”
+- 它是**首次 `connect` 的临时入场券**
+- `deviceToken` 是 Gateway 在配对成功后，于**成功连接响应**里签发给这台设备的长期票据
+
+### 7.3.2 如果你拿到的是 setup code，不是裸 `bootstrapToken`
+
+很多时候服务端给 App 的不是裸 token，而是 setup code。
+
+这时 App 要做的不是把 setup code 当长期口令保存，而是：
+
+1. 解析 setup code
+2. 拿到其中的 `url` 和 `bootstrapToken`
+3. 用解析出来的 `url` 建立 `wss` 连接
+4. 在首次 `connect` 的 `auth.token` 里放这个 `bootstrapToken`
+5. 等成功响应里的 `hello-ok.auth.deviceToken`
+6. 持久化 `deviceToken`，然后删除 setup code / `bootstrapToken`
+
+也就是说：
+
+- setup code 只是 `url + bootstrapToken + 其他配对元信息` 的打包载体
+- 真正长期留在本地的，不应该是 setup code，也不应该是 `bootstrapToken`
+- 应该是第一次配对成功后返回的 `deviceToken`
+
+### 7.3.3 客户端应该按什么状态机实现
+
+建议直接按下面这个状态机写，AI 也比较不容易误解：
+
+```text
+未配对
+  -> 拿到 setup code / bootstrapToken
+  -> 建立 WS
+  -> 收到 connect.challenge
+  -> 发送 connect(auth.token = bootstrapToken, device = stable identity)
+  -> 等待审批 / 等待 connect 成功
+  -> 收到 hello-ok.auth.deviceToken
+  -> 保存 deviceToken + approvedScopes
+  -> 删除 bootstrapToken
+  -> 进入“已配对”
+
+已配对
+  -> 建立 WS
+  -> 收到 connect.challenge
+  -> 发送 connect(auth.token = deviceToken, device = same stable identity)
+  -> 正常工作
+```
+
+对应伪代码可以写成：
+
+```ts
+if (local.deviceToken != null) {
+  authToken = local.deviceToken
+  scopes = local.approvedScopes
+} else {
+  authToken = bootstrapTokenFromSetupCodeOrBackend
+  scopes = requestedScopes
+}
+
+ws = connect(gatewayUrl)
+challenge = await waitConnectChallenge(ws)
+signature = signWithDevicePrivateKey(challenge)
+
+result = await sendConnect(ws, {
+  role: "operator",
+  scopes,
+  auth: { token: authToken },
+  device: stableDeviceIdentity(signature, challenge),
+})
+
+if (result.helloOk?.auth?.deviceToken != null) {
+  local.deviceToken = result.helloOk.auth.deviceToken
+  local.approvedScopes = result.helloOk.scopes ?? scopes
+  local.bootstrapToken = null
+}
+```
+
+上面这段伪代码最关键的语义是：
+
+- **第一次 `sendConnect(...)` 时传入的是 `bootstrapToken`**
+- **同一个配对成功结果里拿到 `hello-ok.auth.deviceToken`**
+- **不是连上以后再额外调一个换 token 接口**
+
+### 7.3.4 成功响应里你到底要取什么
+
+实现时请把下面这条规则写死：
+
+- 只要首次配对成功，就从**成功连接结果**里读取 `hello-ok.auth.deviceToken`
+- 同时把该结果里的 scope 集合也一并保存为 `approvedScopes`
+- 一旦 `deviceToken` 保存成功，就不要再把 `bootstrapToken` 当成长期凭证使用
+
+可以把成功结果概念性理解成：
+
+```json
+{
+  "helloOk": {
+    "role": "operator",
+    "scopes": ["operator.read", "operator.write"],
+    "auth": {
+      "deviceToken": "issued_by_gateway"
+    }
+  }
+}
+```
+
+注意这里我故意写成“概念性结果”，因为不同 SDK、不同包装层，外层事件包裹字段可能不同；**真正不能写错的核心字段是 `hello-ok.auth.deviceToken`**。
+
 ## 7.4 后续重连流程
 
 一旦 App 已经拿到 `deviceToken`，后续重连应切换为：
@@ -535,6 +669,8 @@ Gateway Protocol 要求设备在 `connect` 时提供：
 
 ## 13. 最推荐的工程落地方式
 
+如果我是给 AI 下任务，我会要求它这样实现：
+
 ### Phase 1：单角色 `operator` 配对版
 
 目标：
@@ -586,13 +722,14 @@ Gateway Protocol 要求设备在 `connect` 时提供：
 1. 客户端角色先实现 `operator`
 2. 首次连接使用短期 `bootstrapToken`
 3. 后续连接使用 Gateway 返回的 `deviceToken`
-4. 客户端必须实现完整的 `connect.challenge` 签名流程
-5. 设备身份必须稳定：`device.id` 基于长期密钥对的公钥指纹生成
-6. 私钥必须存储在 Android Keystore，不允许明文落盘
-7. 客户端必须持久化保存：gatewayUrl、deviceId、publicKey、deviceToken、approvedScopes
-8. 后续重连必须复用已保存的 `deviceToken` 和对应 scopes
-9. 第一版只申请 `operator.read` 与 `operator.write`
-10. 需要提供 token 失效、重新配对、清空本地状态的恢复逻辑
+4. 必须明确按以下语义实现：`bootstrapToken` 直接用于第一次 `connect.auth.token`，配对成功后从 `hello-ok.auth.deviceToken` 读取并保存正式 `deviceToken`，不要假设存在额外的 token exchange API
+5. 客户端必须实现完整的 `connect.challenge` 签名流程
+6. 设备身份必须稳定：`device.id` 基于长期密钥对的公钥指纹生成
+7. 私钥必须存储在 Android Keystore，不允许明文落盘
+8. 客户端必须持久化保存：gatewayUrl、deviceId、publicKey、deviceToken、approvedScopes
+9. 后续重连必须复用已保存的 `deviceToken` 和对应 scopes
+10. 第一版只申请 `operator.read` 与 `operator.write`
+11. 需要提供 token 失效、重新配对、清空本地状态的恢复逻辑
 
 请优先保证认证链路正确，再做 UI。
 ```

@@ -315,14 +315,45 @@ class ConnectDeviceProof {
 class ConnectAuth {
   final String? token;
   final String? deviceToken;
+  final String? bootstrapToken;
 
   const ConnectAuth({
     this.token,
     this.deviceToken,
+    this.bootstrapToken,
   });
 
   bool get usesDeviceToken =>
       deviceToken != null && deviceToken!.trim().isNotEmpty;
+  bool get usesBootstrapToken =>
+      bootstrapToken != null && bootstrapToken!.trim().isNotEmpty;
+  bool get usesToken => token != null && token!.trim().isNotEmpty;
+
+  String get authMode {
+    if (usesDeviceToken) {
+      return 'deviceToken';
+    }
+    if (usesBootstrapToken) {
+      return 'bootstrapToken';
+    }
+    if (usesToken) {
+      return 'token';
+    }
+    return 'none';
+  }
+
+  String get signingToken {
+    if (usesDeviceToken) {
+      return deviceToken!.trim();
+    }
+    if (usesBootstrapToken) {
+      return bootstrapToken!.trim();
+    }
+    if (usesToken) {
+      return token!.trim();
+    }
+    return '';
+  }
 
   Object? operator [](String key) => toJson()[key];
 
@@ -330,7 +361,10 @@ class ConnectAuth {
     if (usesDeviceToken) {
       return {'deviceToken': deviceToken};
     }
-    if (token != null && token!.trim().isNotEmpty) {
+    if (usesBootstrapToken) {
+      return {'bootstrapToken': bootstrapToken};
+    }
+    if (usesToken) {
       return {'token': token};
     }
     return <String, dynamic>{};
@@ -339,6 +373,7 @@ class ConnectAuth {
   factory ConnectAuth.fromJson(Map<String, dynamic> json) {
     final token = json['token'];
     final deviceToken = json['deviceToken'];
+    final bootstrapToken = json['bootstrapToken'];
 
     if (token != null && token is! String) {
       throw FormatException('ConnectAuth: "token" must be a string.');
@@ -346,10 +381,14 @@ class ConnectAuth {
     if (deviceToken != null && deviceToken is! String) {
       throw FormatException('ConnectAuth: "deviceToken" must be a string.');
     }
+    if (bootstrapToken != null && bootstrapToken is! String) {
+      throw FormatException('ConnectAuth: "bootstrapToken" must be a string.');
+    }
 
     return ConnectAuth(
       token: token as String?,
       deviceToken: deviceToken as String?,
+      bootstrapToken: bootstrapToken as String?,
     );
   }
 
@@ -358,15 +397,17 @@ class ConnectAuth {
     if (identical(this, other)) return true;
     return other is ConnectAuth &&
         other.token == token &&
-        other.deviceToken == deviceToken;
+        other.deviceToken == deviceToken &&
+        other.bootstrapToken == bootstrapToken;
   }
 
   @override
-  int get hashCode => Object.hash(token, deviceToken);
+  int get hashCode => Object.hash(token, deviceToken, bootstrapToken);
 
   @override
   String toString() {
     return 'ConnectAuth(token: ${token == null ? null : '<redacted>'}, '
-        'deviceToken: ${deviceToken == null ? null : '<redacted>'})';
+        'deviceToken: ${deviceToken == null ? null : '<redacted>'}, '
+        'bootstrapToken: ${bootstrapToken == null ? null : '<redacted>'})';
   }
 }

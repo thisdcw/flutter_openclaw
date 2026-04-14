@@ -22,6 +22,7 @@ class ConnectSigner {
     required DeviceIdentity identity,
     required String authToken,
     required String deviceToken,
+    bool useBootstrapAuth = false,
     required List<String> scopes,
     required String locale,
     int? signedAt,
@@ -31,6 +32,7 @@ class ConnectSigner {
     final auth = _buildAuth(
       authToken: authToken,
       deviceToken: deviceToken,
+      useBootstrapAuth: useBootstrapAuth,
     );
     final effectiveScopes = scopes.isNotEmpty ? scopes : defaultOperatorScopes;
     final payload = _buildPayload(
@@ -38,7 +40,7 @@ class ConnectSigner {
       signedAt: effectiveSignedAt,
       nonce: challenge.nonce,
       scopes: effectiveScopes,
-      signingToken: auth.usesDeviceToken ? auth.deviceToken! : auth.token ?? '',
+      signingToken: auth.signingToken,
     );
     final signature = await _keystoreSigner.signPayload(payload);
 
@@ -74,9 +76,13 @@ class ConnectSigner {
   ConnectAuth _buildAuth({
     required String authToken,
     required String deviceToken,
+    required bool useBootstrapAuth,
   }) {
     if (deviceToken.trim().isNotEmpty) {
       return ConnectAuth(deviceToken: deviceToken.trim());
+    }
+    if (useBootstrapAuth) {
+      return ConnectAuth(bootstrapToken: authToken.trim());
     }
     return ConnectAuth(token: authToken.trim());
   }
