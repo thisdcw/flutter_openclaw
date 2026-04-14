@@ -1,4 +1,5 @@
 import 'gateway_failure.dart';
+import 'canvas_capability_snapshot.dart';
 
 enum ConnectionPhase {
   idle,
@@ -26,12 +27,14 @@ class ConnectionStatus {
   final List<String> grantedScopes;
   final String? deviceId;
   final GatewayFailure? failure;
+  final CanvasCapabilitySnapshot canvasCapability;
 
   const ConnectionStatus({
     required this.phase,
     this.grantedScopes = const <String>[],
     this.deviceId,
     this.failure,
+    this.canvasCapability = const CanvasCapabilitySnapshot.unavailable(),
   });
 
   bool get isReady => phase == ConnectionPhase.ready;
@@ -41,6 +44,8 @@ class ConnectionStatus {
       grantedScopes.any(
         (scope) => scope.toLowerCase() == 'operator.write',
       );
+
+  bool get canOpenCanvas => isReady && canvasCapability.isAvailable;
 
   String get sendBlockedReason {
     if (!isReady) {
@@ -57,6 +62,7 @@ class ConnectionStatus {
     List<String>? grantedScopes,
     String? deviceId,
     GatewayFailure? failure,
+    CanvasCapabilitySnapshot? canvasCapability,
     bool clearFailure = false,
   }) {
     return ConnectionStatus(
@@ -64,6 +70,7 @@ class ConnectionStatus {
       grantedScopes: grantedScopes ?? this.grantedScopes,
       deviceId: deviceId ?? this.deviceId,
       failure: clearFailure ? null : failure ?? this.failure,
+      canvasCapability: canvasCapability ?? this.canvasCapability,
     );
   }
 
@@ -73,6 +80,7 @@ class ConnectionStatus {
       'grantedScopes': List<String>.from(grantedScopes),
       'deviceId': deviceId,
       'failure': failure?.toJson(),
+      'canvasCapability': canvasCapability.toJson(),
     };
   }
 
@@ -85,6 +93,7 @@ class ConnectionStatus {
       failure: rawFailure == null
           ? null
           : GatewayFailure.fromJson(_objectValue(rawFailure, 'failure')),
+      canvasCapability: _parseCanvasCapability(json['canvasCapability']),
     );
   }
 
@@ -95,7 +104,8 @@ class ConnectionStatus {
         other.phase == phase &&
         _listEquals(other.grantedScopes, grantedScopes) &&
         other.deviceId == deviceId &&
-        other.failure == failure;
+        other.failure == failure &&
+        other.canvasCapability == canvasCapability;
   }
 
   @override
@@ -104,13 +114,14 @@ class ConnectionStatus {
         Object.hashAll(grantedScopes),
         deviceId,
         failure,
+        canvasCapability,
       );
 
   @override
   String toString() {
     return 'ConnectionStatus(phase: ${phase.value}, grantedScopes: '
         '$grantedScopes, deviceId: $deviceId, failure: $failure, canSend: '
-        '$canSend)';
+        '$canSend, canvasCapability: $canvasCapability)';
   }
 
   static String _string(Map<String, dynamic> json, String key) {
@@ -151,6 +162,18 @@ class ConnectionStatus {
       }).toList(growable: false);
     }
     throw FormatException('ConnectionStatus: "$key" must be a list.');
+  }
+
+  static CanvasCapabilitySnapshot _parseCanvasCapability(Object? value) {
+    if (value == null) {
+      return const CanvasCapabilitySnapshot.unavailable();
+    }
+    if (value is Map) {
+      return CanvasCapabilitySnapshot.fromJson(Map<String, dynamic>.from(value));
+    }
+    throw FormatException(
+      'ConnectionStatus: "canvasCapability" must be an object.',
+    );
   }
 
   static bool _listEquals(List<String> a, List<String> b) {

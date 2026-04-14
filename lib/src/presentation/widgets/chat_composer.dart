@@ -47,9 +47,16 @@ class ChatComposer extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.94),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: theme.colorScheme.outline),
+        color: Colors.white.withOpacity(0.96),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.9)),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x1A1A3B7A),
+            blurRadius: 18,
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -120,6 +127,8 @@ class ChatComposer extends StatelessWidget {
                     horizontal: 14,
                     vertical: 12,
                   ),
+                  backgroundColor: const Color(0xFF2F6BFF),
+                  foregroundColor: Colors.white,
                   minimumSize: Size.zero,
                 ),
                 child: Text(isSending ? l10n.sendingLabel : l10n.sendLabel),

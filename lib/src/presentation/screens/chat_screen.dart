@@ -10,6 +10,7 @@ import '../../application/models/app_error_notice.dart';
 import '../../application/controllers/chat_controller.dart';
 import '../../application/controllers/connection_controller.dart';
 import '../../application/controllers/settings_controller.dart';
+import '../../application/use_cases/send_canvas_user_action_use_case.dart';
 import '../../domain/models/chat_draft.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/connection_status.dart';
@@ -23,6 +24,7 @@ import '../widgets/conversation_list_sheet.dart';
 import '../widgets/error_notice_banner.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/status_badge.dart';
+import 'canvas_screen.dart';
 import 'settings_screen.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -30,11 +32,13 @@ class ChatScreen extends StatefulWidget {
     super.key,
     required this.chatController,
     required this.connectionController,
+    this.sendCanvasUserActionUseCase,
     this.settingsController,
   });
 
   final ChatController chatController;
   final ConnectionController connectionController;
+  final SendCanvasUserActionUseCase? sendCanvasUserActionUseCase;
   final SettingsController? settingsController;
 
   @override
@@ -113,6 +117,12 @@ class _ChatScreenState extends State<ChatScreen> {
           connectionStatus,
           isConnecting,
         );
+        final hasCanvasHost =
+            (connectionStatus.canvasCapability.canvasHostUrl ?? '').trim().isNotEmpty;
+        final canOpenCanvas = connectionStatus.isReady &&
+            hasCanvasHost &&
+            widget.sendCanvasUserActionUseCase != null &&
+            widget.settingsController != null;
         _syncMessageViewport(
           conversationId: activeConversation?.id,
           messages: messages,
@@ -154,6 +164,17 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               StatusBadge(label: widget.connectionController.phase),
               const SizedBox(width: 6),
+              IconButton(
+                onPressed: canOpenCanvas
+                    ? _openCanvas
+                    : connectionStatus.isReady && hasCanvasHost
+                        ? null
+                        : _showCanvasUnavailableHint,
+                icon: const Icon(Icons.dashboard_customize_rounded),
+                tooltip: canOpenCanvas
+                    ? 'Open canvas host'
+                    : 'Canvas unavailable (missing structured canvasHostUrl)',
+              ),
               IconButton(
                 onPressed: widget.settingsController == null
                     ? null
@@ -207,6 +228,15 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       const SizedBox(height: 8),
                     ],
+                    if (connectionStatus.isReady && !hasCanvasHost) ...[
+                      const _InfoBanner(
+                        message:
+                            'Canvas capability unavailable: missing structured canvasHostUrl, chat mode stays active.',
+                        color: Color(0xFF2F6BFF),
+                        textColor: Colors.white,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     if (widget.chatController.errorNotice != null) ...[
                       ErrorNoticeBanner(
                         notice: widget.chatController.errorNotice!,
@@ -214,76 +244,66 @@ class _ChatScreenState extends State<ChatScreen> {
                       const SizedBox(height: 8),
                     ],
                     Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.52),
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(
-                            color: theme.colorScheme.outline.withOpacity(0.45),
-                          ),
-                        ),
-                        child: messages.isEmpty
-                            ? _ChatEmptyState(
-                                l10n: l10n,
-                                discoveryCommands: discoveryCommands,
-                                onSelectCommand: _applyCommandTemplate,
-                              )
-                            : ListView.separated(
-                                controller: messageScrollController,
-                                padding: EdgeInsets.zero,
-                                itemCount: messages.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 4),
-                                itemBuilder: (context, index) {
-                                  return MessageBubble(message: messages[index]);
-                                },
-                              ),
-                      ),
+                      child: messages.isEmpty
+                          ? _ChatEmptyState(
+                              l10n: l10n,
+                              discoveryCommands: discoveryCommands,
+                              onSelectCommand: _applyCommandTemplate,
+                            )
+                          : ListView.separated(
+                              controller: messageScrollController,
+                              padding: const EdgeInsets.fromLTRB(2, 2, 2, 8),
+                              itemCount: messages.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 4),
+                              itemBuilder: (context, index) {
+                                return MessageBubble(message: messages[index]);
+                              },
+                            ),
                     ),
-                    const SizedBox(height: 8),
-                    ChatComposer(
-                      controller: composerController,
-                      focusNode: composerFocusNode,
-                      enabled: widget.connectionController.canSend,
-                      hasContent: hasDraftContent,
-                      isSending: widget.chatController.isSending,
-                      attachments: pendingAttachments,
-                      commandSuggestions: commandSuggestions,
-                      commandHintKind: commandHint,
-                      onSelectCommandSuggestion: _applyCommandTemplate,
-                      onPickImages: _pickImages,
-                      onRemoveAttachment: _removeAttachment,
-                      onSend: () async {
-                        final text = composerController.text;
-                        if (!hasDraftContent) {
-                          return;
-                        }
-                        openClawLog(
-                          'ChatScreen',
-                          'composer send tapped',
-                          fields: <String, Object?>{
-                            'enabled': widget.connectionController.canSend,
-                            'phase': widget.connectionController.phase,
-                            'textLength': text.length,
-                            'preview': truncateForLog(text, maxLength: 80),
-                          },
-                        );
-                        await widget.chatController.send(
-                          ChatDraft(
-                            text: text,
-                            attachments: pendingAttachments,
-                          ),
-                        );
-                        if (!mounted) {
-                          return;
-                        }
-                        composerController.clear();
-                        setState(pendingAttachments.clear);
-                      },
+                    const SizedBox(height: 10),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(2, 0, 2, 2),
+                      child: ChatComposer(
+                        controller: composerController,
+                        focusNode: composerFocusNode,
+                        enabled: widget.connectionController.canSend,
+                        hasContent: hasDraftContent,
+                        isSending: widget.chatController.isSending,
+                        attachments: pendingAttachments,
+                        commandSuggestions: commandSuggestions,
+                        commandHintKind: commandHint,
+                        onSelectCommandSuggestion: _applyCommandTemplate,
+                        onPickImages: _pickImages,
+                        onRemoveAttachment: _removeAttachment,
+                        onSend: () async {
+                          final text = composerController.text;
+                          if (!hasDraftContent) {
+                            return;
+                          }
+                          openClawLog(
+                            'ChatScreen',
+                            'composer send tapped',
+                            fields: <String, Object?>{
+                              'enabled': widget.connectionController.canSend,
+                              'phase': widget.connectionController.phase,
+                              'textLength': text.length,
+                              'preview': truncateForLog(text, maxLength: 80),
+                            },
+                          );
+                          await widget.chatController.send(
+                            ChatDraft(
+                              text: text,
+                              attachments: pendingAttachments,
+                            ),
+                          );
+                          if (!mounted) {
+                            return;
+                          }
+                          composerController.clear();
+                          setState(pendingAttachments.clear);
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -307,6 +327,44 @@ class _ChatScreenState extends State<ChatScreen> {
           connectionController: widget.connectionController,
           chatController: widget.chatController,
         ),
+      ),
+    );
+  }
+
+  void _openCanvas() {
+    final settingsController = widget.settingsController;
+    final sendCanvasUserActionUseCase = widget.sendCanvasUserActionUseCase;
+    final canvasHostUrl =
+        widget.connectionController.status.canvasCapability.canvasHostUrl;
+    if (settingsController == null ||
+        sendCanvasUserActionUseCase == null ||
+        canvasHostUrl == null ||
+        canvasHostUrl.trim().isEmpty) {
+      _showCanvasUnavailableHint();
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => CanvasScreen(
+          initialCanvasHostUrl: canvasHostUrl,
+          canvasCapability:
+              widget.connectionController.status.canvasCapability.canvasCapability,
+          configProvider: () => settingsController.config,
+          sendCanvasUserActionUseCase: sendCanvasUserActionUseCase,
+        ),
+      ),
+    );
+  }
+
+  void _showCanvasUnavailableHint() {
+    final message = widget.connectionController.status.isReady
+        ? '当前连接未提供结构化 canvasHostUrl，已降级为普通聊天模式。'
+        : '请先连接 Gateway，连接成功后再尝试进入 canvas。';
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -758,12 +816,20 @@ class _ConnectionStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final foregroundColor = Colors.white;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF4FF),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.5)),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            Color(0xFF2F6BFF),
+            Color(0xFF1F57DF),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF5E8BFF)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -771,8 +837,8 @@ class _ConnectionStrip extends StatelessWidget {
           Container(
             width: 28,
             height: 28,
-            decoration: const BoxDecoration(
-              color: Color(0xFF2F6BFF),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.18),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -787,10 +853,21 @@ class _ConnectionStrip extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(title, style: theme.textTheme.titleSmall),
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: foregroundColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 if (subtitle.isNotEmpty) ...[
                   const SizedBox(height: 2),
-                  Text(subtitle, style: theme.textTheme.bodySmall),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: foregroundColor.withOpacity(0.88),
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -801,6 +878,8 @@ class _ConnectionStrip extends StatelessWidget {
               FilledButton(
                 onPressed: onPressed,
                 style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF2F6BFF),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   minimumSize: Size.zero,
@@ -812,6 +891,8 @@ class _ConnectionStrip extends StatelessWidget {
               OutlinedButton(
                 onPressed: onPressed,
                 style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: BorderSide(color: Colors.white.withOpacity(0.62)),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   minimumSize: Size.zero,

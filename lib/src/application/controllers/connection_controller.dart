@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/app_error_notice.dart';
 import 'app_error_controller.dart';
+import '../../domain/models/canvas_capability_snapshot.dart';
 import '../../domain/models/connection_status.dart';
 import '../../domain/models/gateway_failure.dart';
 import '../../domain/models/gateway_config.dart';
@@ -180,11 +181,13 @@ class ConnectionController extends ChangeNotifier {
   void markReady({
     required List<String> grantedScopes,
     String? deviceId,
+    CanvasCapabilitySnapshot? canvasCapability,
   }) {
     _status = ConnectionStatus(
       phase: ConnectionPhase.ready,
       grantedScopes: List<String>.from(grantedScopes),
       deviceId: deviceId ?? _status.deviceId,
+      canvasCapability: canvasCapability ?? _status.canvasCapability,
     );
     errorNotice = null;
     notifyListeners();

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../domain/models/canvas_capability_snapshot.dart';
 import '../../domain/models/connect_challenge.dart';
 import '../../domain/models/gateway_failure.dart';
 import '../../domain/models/operator_auth_state.dart';
@@ -87,6 +88,63 @@ class GatewayProtocolParser {
           ? const <String, Object?>{}
           : Map<String, Object?>.from(details),
     );
+  }
+
+  CanvasCapabilitySnapshot extractCanvasCapability(
+    GatewayFrame frame, {
+    required String source,
+  }) {
+    final candidates = _canvasCapabilityCandidates(frame.payload);
+    String? hostUrl;
+    String? capability;
+    int? expiresAtMs;
+    for (final candidate in candidates) {
+      hostUrl ??= _extractCanvasHostUrl(candidate);
+      capability ??= _extractCanvasCapability(candidate);
+      expiresAtMs ??= _extractCanvasExpiresAtMs(candidate);
+    }
+    if (hostUrl == null) {
+      return CanvasCapabilitySnapshot.unavailable(
+        source: source,
+        reason: 'canvasHostUrl missing',
+      );
+    }
+    return CanvasCapabilitySnapshot(
+      canvasHostUrl: hostUrl,
+      canvasCapability: capability,
+      canvasCapabilityExpiresAtMs: expiresAtMs,
+      source: source,
+    );
+  }
+
+  bool looksLikePseudoCanvasDirective(String text) {
+    final normalized = text.trim();
+    if (normalized.isEmpty) {
+      return false;
+    }
+    final hasDirectiveKeywords = normalized.contains('"action"') &&
+        (normalized.contains('"canvas"') ||
+            normalized.contains('"eval"') ||
+            normalized.contains('"javaScript"'));
+    if (!hasDirectiveKeywords) {
+      return false;
+    }
+
+    final decoded = _tryDecodeObject(normalized);
+    if (decoded == null) {
+      return false;
+    }
+    final action = _safeString(decoded['action'])?.toLowerCase();
+    final javaScript = _safeString(decoded['javaScript']);
+    final params = _safeObject(decoded['params']);
+    final nestedAction = _safeString(params?['action'])?.toLowerCase();
+    final nestedJavaScript = _safeString(params?['javaScript']);
+
+    final actionLooksCanvas = action == 'canvas' || nestedAction == 'canvas';
+    final actionLooksEval = action == 'eval' || nestedAction == 'eval';
+    final hasJavaScript = (javaScript?.isNotEmpty ?? false) ||
+        (nestedJavaScript?.isNotEmpty ?? false);
+    return actionLooksCanvas || actionLooksEval || hasJavaScript;
   }
 
   String extractAssistantDelta(GatewayFrame frame) {
@@ -211,5 +269,112 @@ class GatewayProtocolParser {
     throw FormatException(
       'GatewayProtocolParser: "$label" must be a list.',
     );
+  }
+
+  static List<Map<String, dynamic>> _canvasCapabilityCandidates(
+    Map<String, dynamic> payload,
+  ) {
+    final candidates = <Map<String, dynamic>>[payload];
+    final data = _safeObject(payload['data']);
+    if (data != null) {
+      candidates.add(data);
+    }
+    final result = _safeObject(payload['result']);
+    if (result != null) {
+      candidates.add(result);
+    }
+    return candidates;
+  }
+
+  static String? _extractCanvasHostUrl(Map<String, dynamic> value) {
+    final rootHost = _normalizeCanvasHostUrl(_safeString(value['canvasHostUrl']));
+    if (rootHost != null) {
+      return rootHost;
+    }
+    final canvas = _safeObject(value['canvas']);
+    if (canvas == null) {
+      return null;
+    }
+    return _normalizeCanvasHostUrl(
+      _safeString(canvas['canvasHostUrl']) ??
+          _safeString(canvas['hostUrl']) ??
+          _safeString(canvas['url']),
+    );
+  }
+
+  static String? _extractCanvasCapability(Map<String, dynamic> value) {
+    final rootCapability = _safeString(value['canvasCapability']);
+    if (rootCapability != null && rootCapability.trim().isNotEmpty) {
+      return rootCapability.trim();
+    }
+    final canvas = _safeObject(value['canvas']);
+    final nested = _safeString(canvas?['capability']);
+    if (nested == null || nested.trim().isEmpty) {
+      return null;
+    }
+    return nested.trim();
+  }
+
+  static int? _extractCanvasExpiresAtMs(Map<String, dynamic> value) {
+    final rootValue = _safeInt(value['canvasCapabilityExpiresAtMs']);
+    if (rootValue != null) {
+      return rootValue;
+    }
+    final canvas = _safeObject(value['canvas']);
+    return _safeInt(canvas?['expiresAtMs']);
+  }
+
+  static String? _normalizeCanvasHostUrl(String? rawValue) {
+    if (rawValue == null) {
+      return null;
+    }
+    final normalized = rawValue.trim();
+    if (normalized.isEmpty) {
+      return null;
+    }
+    final uri = Uri.tryParse(normalized);
+    if (uri == null || uri.scheme.isEmpty || uri.host.isEmpty) {
+      return null;
+    }
+    return normalized;
+  }
+
+  static Map<String, dynamic>? _tryDecodeObject(String text) {
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Map<String, dynamic>? _safeObject(Object? value) {
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    return null;
+  }
+
+  static String? _safeString(Object? value) {
+    if (value is String) {
+      return value;
+    }
+    return null;
+  }
+
+  static int? _safeInt(Object? value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    if (value is String) {
+      return int.tryParse(value.trim());
+    }
+    return null;
   }
 }

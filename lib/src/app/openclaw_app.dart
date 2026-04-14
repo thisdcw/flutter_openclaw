@@ -41,6 +41,7 @@ class OpenClawApp extends StatelessWidget {
             settingsController: dependencies.settingsController,
             connectionController: dependencies.connectionController,
             chatController: dependencies.chatController,
+            sendCanvasUserActionUseCase: dependencies.sendCanvasUserActionUseCase,
           ),
         );
       },

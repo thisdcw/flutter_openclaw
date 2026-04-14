@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/painting.dart' show NetworkImageLoadException;
 import 'package:flutter/services.dart';
 import 'package:flutter_openclaw/l10n/app_localizations.dart';
 
@@ -265,6 +266,10 @@ class _MessageSegmentView extends StatelessWidget {
               );
             },
             errorBuilder: (context, error, stackTrace) {
+              final failureText = _friendlyInlineImageError(
+                error,
+                fallbackText: imageSegment.altText ?? imageSegment.url,
+              );
               return Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
@@ -272,7 +277,7 @@ class _MessageSegmentView extends StatelessWidget {
                     ? Colors.white.withOpacity(0.14)
                     : const Color(0xFFF2F6FB),
                 child: Text(
-                  imageSegment.altText ?? imageSegment.url,
+                  failureText,
                   style: theme.textTheme.bodySmall?.copyWith(color: textColor),
                 ),
               );
@@ -296,4 +301,17 @@ String _guessMimeType(String fileName) {
     return 'image/gif';
   }
   return 'image/jpeg';
+}
+
+String _friendlyInlineImageError(
+  Object error, {
+  required String fallbackText,
+}) {
+  if (error is NetworkImageLoadException) {
+    if (error.statusCode == 429) {
+      return '图片服务限流（HTTP 429），请稍后再试。';
+    }
+    return '图片加载失败（HTTP ${error.statusCode}）。';
+  }
+  return fallbackText;
 }

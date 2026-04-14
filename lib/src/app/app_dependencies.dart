@@ -8,6 +8,7 @@ import 'package:flutter_openclaw/src/application/use_cases/bootstrap_app_use_cas
 import 'package:flutter_openclaw/src/application/use_cases/clear_operator_auth_use_case.dart';
 import 'package:flutter_openclaw/src/application/use_cases/import_bootstrap_token_use_case.dart';
 import 'package:flutter_openclaw/src/application/use_cases/reset_device_identity_use_case.dart';
+import 'package:flutter_openclaw/src/application/use_cases/send_canvas_user_action_use_case.dart';
 import 'package:flutter_openclaw/src/application/use_cases/send_chat_message_use_case.dart';
 import 'package:flutter_openclaw/src/application/use_cases/test_connection_use_case.dart';
 import 'package:flutter_openclaw/src/domain/models/connection_status.dart';
@@ -27,12 +28,14 @@ class AppDependencies {
     required this.connectionController,
     required this.chatController,
     required this.appErrorController,
+    required this.sendCanvasUserActionUseCase,
   });
 
   final SettingsController settingsController;
   final ConnectionController connectionController;
   final ChatController chatController;
   final AppErrorController appErrorController;
+  final SendCanvasUserActionUseCase? sendCanvasUserActionUseCase;
 
   static Future<AppDependencies> create({
     AppErrorController? appErrorController,
@@ -82,6 +85,10 @@ class AppDependencies {
       testConnectionUseCase,
       parser: parser,
     );
+    final sendCanvasUserActionUseCase = SendCanvasUserActionUseCase(
+      testConnectionUseCase,
+      parser: parser,
+    );
     final settingsController = SettingsController(
       initialConfig: initialConfig,
       initialLocalePreference: initialLocalePreference,
@@ -116,6 +123,7 @@ class AppDependencies {
       connectionController: connectionController,
       chatController: chatController,
       appErrorController: resolvedAppErrorController,
+      sendCanvasUserActionUseCase: sendCanvasUserActionUseCase,
     );
   }
 
@@ -132,6 +140,7 @@ class AppDependencies {
         appErrorController: appErrorController,
       ),
       appErrorController: appErrorController,
+      sendCanvasUserActionUseCase: null,
     );
   }
 }

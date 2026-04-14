@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../domain/models/bootstrap_token_state.dart';
+import '../../domain/models/canvas_capability_snapshot.dart';
 import '../../domain/models/connection_status.dart';
 import '../../domain/models/device_identity.dart';
 import '../../domain/models/gateway_config.dart';
@@ -23,12 +24,14 @@ class AuthenticatedGatewaySession {
     required this.status,
     required this.deviceIdentity,
     required this.operatorAuth,
+    required this.canvasCapability,
   });
 
   final GatewayClient client;
   final ConnectionStatus status;
   final DeviceIdentity deviceIdentity;
   final OperatorAuthState? operatorAuth;
+  final CanvasCapabilitySnapshot canvasCapability;
 
   Future<void> dispose() => client.dispose();
 }
@@ -294,6 +297,22 @@ class TestConnectionUseCase {
           },
         );
       }
+      final canvasCapability = await _resolveCanvasCapability(
+        client: client,
+        helloFrame: response,
+        timeoutMs: config.timeoutMs,
+      );
+      openClawLog(
+        'TestConnection',
+        'canvas capability resolved',
+        fields: <String, Object?>{
+          'available': canvasCapability.isAvailable,
+          'source': canvasCapability.source,
+          'canvasHostUrl': canvasCapability.canvasHostUrl ?? '(none)',
+          'expiresAtMs': canvasCapability.canvasCapabilityExpiresAtMs,
+          'reason': canvasCapability.reason ?? '(none)',
+        },
+      );
 
       return AuthenticatedGatewaySession(
         client: client,
@@ -303,7 +322,9 @@ class TestConnectionUseCase {
           phase: ConnectionPhase.ready,
           grantedScopes: nextAuth?.scopes ?? const <String>[],
           deviceId: deviceIdentity.id,
+          canvasCapability: canvasCapability,
         ),
+        canvasCapability: canvasCapability,
       );
     } catch (error) {
       openClawLog(
@@ -316,6 +337,94 @@ class TestConnectionUseCase {
       await client.dispose();
       rethrow;
     }
+  }
+
+  Future<CanvasCapabilitySnapshot> _resolveCanvasCapability({
+    required GatewayClient client,
+    required GatewayFrame helloFrame,
+    required int timeoutMs,
+  }) async {
+    final helloSnapshot = _parser.extractCanvasCapability(
+      helloFrame,
+      source: 'hello-ok',
+    );
+    final refreshedSnapshot = await _refreshCanvasCapability(
+      client: client,
+      timeoutMs: timeoutMs,
+    );
+    return _mergeCanvasCapabilities(
+      helloSnapshot: helloSnapshot,
+      refreshedSnapshot: refreshedSnapshot,
+    );
+  }
+
+  Future<CanvasCapabilitySnapshot> _refreshCanvasCapability({
+    required GatewayClient client,
+    required int timeoutMs,
+  }) async {
+    final requestId = 'canvas-cap-${_uuid.v4()}';
+    try {
+      client.send(
+        <String, Object?>{
+          'type': 'req',
+          'id': requestId,
+          'method': 'node.canvas.capability.refresh',
+          'params': const <String, Object?>{},
+        },
+      );
+      final response = await client.frames
+          .firstWhere(
+            (frame) => frame.type == 'res' && frame.id == requestId,
+          )
+          .timeout(Duration(milliseconds: timeoutMs));
+      final failure = _parser.extractFailure(response);
+      if (failure != null) {
+        return CanvasCapabilitySnapshot.unavailable(
+          source: 'capability.refresh',
+          reason: failure.message,
+        );
+      }
+      final snapshot = _parser.extractCanvasCapability(
+        response,
+        source: 'capability.refresh',
+      );
+      if (snapshot.isAvailable) {
+        return snapshot;
+      }
+      return snapshot.copyWith(
+        reason: snapshot.reason ?? 'canvasHostUrl missing from capability refresh',
+      );
+    } on TimeoutException {
+      return const CanvasCapabilitySnapshot.unavailable(
+        source: 'capability.refresh',
+        reason: 'node.canvas.capability.refresh timeout',
+      );
+    } catch (error) {
+      return CanvasCapabilitySnapshot.unavailable(
+        source: 'capability.refresh',
+        reason: error.toString(),
+      );
+    }
+  }
+
+  CanvasCapabilitySnapshot _mergeCanvasCapabilities({
+    required CanvasCapabilitySnapshot helloSnapshot,
+    required CanvasCapabilitySnapshot refreshedSnapshot,
+  }) {
+    if (refreshedSnapshot.isAvailable) {
+      return refreshedSnapshot;
+    }
+    if (helloSnapshot.isAvailable) {
+      return helloSnapshot.copyWith(
+        reason: refreshedSnapshot.reason,
+      );
+    }
+    return CanvasCapabilitySnapshot.unavailable(
+      source: refreshedSnapshot.source != 'none'
+          ? refreshedSnapshot.source
+          : helloSnapshot.source,
+      reason: refreshedSnapshot.reason ?? helloSnapshot.reason,
+    );
   }
 
   bool _isBootstrapTokenMismatch(GatewayFailure failure) {

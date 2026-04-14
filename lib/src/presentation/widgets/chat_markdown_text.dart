@@ -201,7 +201,11 @@ List<InlineSpan> _buildInlineSpans(
       ) ??
       TextStyle(color: textColor, height: 1.45);
   final pattern = RegExp(
-    r'(\[([^\]]+)\]\((https?:\/\/[^)]+)\))|(`([^`]+)`)|(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(https?:\/\/[^\s]+)',
+    r'(?<md_link>\[(?<md_link_text>[^\]]+)\]\((?<md_link_url>https?:\/\/[^)]+)\))|'
+    r'(?<inline_code>`(?<inline_code_text>[^`]+)`)'
+    r'|(?<bold>\*\*(?<bold_text>[^*]+)\*\*)'
+    r'|(?<italic>\*(?<italic_text>[^*]+)\*)'
+    r'|(?<plain_url>https?:\/\/[^\s]+)',
   );
   final spans = <InlineSpan>[];
   var cursor = 0;
@@ -209,44 +213,44 @@ List<InlineSpan> _buildInlineSpans(
     if (match.start > cursor) {
       spans.add(TextSpan(text: text.substring(cursor, match.start)));
     }
-    if (match.group(1) != null) {
+    if (match.namedGroup('md_link') != null) {
       spans.add(
         TextSpan(
-          text: match.group(2),
+          text: match.namedGroup('md_link_text'),
           style: effectiveStyle.copyWith(
             color: Colors.lightBlue.shade100,
             decoration: TextDecoration.underline,
           ),
         ),
       );
-    } else if (match.group(4) != null) {
+    } else if (match.namedGroup('inline_code') != null) {
       spans.add(
         TextSpan(
-          text: match.group(4),
+          text: match.namedGroup('inline_code_text'),
           style: effectiveStyle.copyWith(
             fontFamily: 'monospace',
             backgroundColor: Colors.black.withOpacity(0.08),
           ),
         ),
       );
-    } else if (match.group(6) != null) {
+    } else if (match.namedGroup('bold') != null) {
       spans.add(
         TextSpan(
-          text: match.group(6),
+          text: match.namedGroup('bold_text'),
           style: effectiveStyle.copyWith(fontWeight: FontWeight.w700),
         ),
       );
-    } else if (match.group(8) != null) {
+    } else if (match.namedGroup('italic') != null) {
       spans.add(
         TextSpan(
-          text: match.group(8),
+          text: match.namedGroup('italic_text'),
           style: effectiveStyle.copyWith(fontStyle: FontStyle.italic),
         ),
       );
-    } else if (match.group(9) != null) {
+    } else if (match.namedGroup('plain_url') != null) {
       spans.add(
         TextSpan(
-          text: match.group(9),
+          text: match.namedGroup('plain_url'),
           style: effectiveStyle.copyWith(
             color: Colors.lightBlue.shade100,
             decoration: TextDecoration.underline,

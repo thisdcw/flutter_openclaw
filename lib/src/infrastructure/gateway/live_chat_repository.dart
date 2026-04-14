@@ -126,6 +126,18 @@ class LiveChatRepository implements ChatRepository {
           'preview': truncateForLog(messageText, maxLength: 120),
         },
       );
+      if (!isStreaming &&
+          _parser.looksLikePseudoCanvasDirective(messageText)) {
+        openClawLog(
+          'ChatRepository',
+          'ignored pseudo canvas directive from assistant text',
+          fields: <String, Object?>{
+            'requestId': request.requestId,
+            'runId': request.runId,
+            'preview': truncateForLog(messageText, maxLength: 160),
+          },
+        );
+      }
       request.finished = !isStreaming;
       controller.add(
         ChatMessage(
