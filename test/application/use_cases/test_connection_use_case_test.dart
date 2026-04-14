@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:stream_channel/stream_channel.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'package:flutter_openclaw/src/application/use_cases/test_connection_use_case.dart';
@@ -115,8 +114,7 @@ class _FakeDeviceIdentityService extends DeviceIdentityService {
   Future<DeviceIdentity> create() async => identity;
 }
 
-class _FakeWebSocketChannel extends StreamChannelMixin<dynamic>
-    implements WebSocketChannel {
+class _FakeWebSocketChannel implements WebSocketChannel {
   _FakeWebSocketChannel()
       : _stream = const Stream<dynamic>.empty(),
         _sink = _FakeWebSocketSink();
