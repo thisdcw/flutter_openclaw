@@ -161,7 +161,7 @@ class SettingsController extends ChangeNotifier {
     if (_config.sessionId == sessionId) {
       return;
     }
-    final next = _config.copyWith(sessionId: sessionId);
+    final next = _normalizeGateway(_config.copyWith(sessionId: sessionId));
     _config = next;
     await _configRepository?.save(next);
     notifyListeners();
