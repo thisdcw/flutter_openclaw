@@ -8,5 +8,10 @@ abstract class ChatConversationStore {
 
   Future<ChatStoreSnapshot> activateConversation(String conversationId);
 
+  Future<ChatStoreSnapshot> renameConversationTitle({
+    required String conversationId,
+    required String title,
+  });
+
   Future<void> saveConversation(ChatConversationRecord conversation);
 }

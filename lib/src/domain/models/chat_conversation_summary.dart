@@ -6,6 +6,7 @@ class ChatConversationSummary {
     required this.previewText,
     required this.updatedAtMs,
     required this.messageCount,
+    this.isTitleManuallyEdited = false,
   });
 
   final String id;
@@ -14,6 +15,7 @@ class ChatConversationSummary {
   final String previewText;
   final int updatedAtMs;
   final int messageCount;
+  final bool isTitleManuallyEdited;
 
   ChatConversationSummary copyWith({
     String? id,
@@ -22,6 +24,7 @@ class ChatConversationSummary {
     String? previewText,
     int? updatedAtMs,
     int? messageCount,
+    bool? isTitleManuallyEdited,
   }) {
     return ChatConversationSummary(
       id: id ?? this.id,
@@ -30,6 +33,8 @@ class ChatConversationSummary {
       previewText: previewText ?? this.previewText,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
       messageCount: messageCount ?? this.messageCount,
+      isTitleManuallyEdited:
+          isTitleManuallyEdited ?? this.isTitleManuallyEdited,
     );
   }
 
@@ -41,6 +46,7 @@ class ChatConversationSummary {
       'previewText': previewText,
       'updatedAtMs': updatedAtMs,
       'messageCount': messageCount,
+      'isTitleManuallyEdited': isTitleManuallyEdited,
     };
   }
 
@@ -52,6 +58,7 @@ class ChatConversationSummary {
       previewText: _string(json, 'previewText'),
       updatedAtMs: _int(json, 'updatedAtMs'),
       messageCount: _int(json, 'messageCount'),
+      isTitleManuallyEdited: _boolOrFalse(json, 'isTitleManuallyEdited'),
     );
   }
 
@@ -72,5 +79,13 @@ class ChatConversationSummary {
       return value.toInt();
     }
     throw FormatException('ChatConversationSummary: "$key" must be an int.');
+  }
+
+  static bool _boolOrFalse(Map<String, dynamic> json, String key) {
+    final value = json[key];
+    if (value is bool) {
+      return value;
+    }
+    return false;
   }
 }

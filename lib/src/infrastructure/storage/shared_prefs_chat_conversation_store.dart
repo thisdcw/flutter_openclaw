@@ -10,10 +10,8 @@ import '../../domain/models/chat_store_snapshot.dart';
 import '../../domain/repositories/chat_conversation_store.dart';
 
 class SharedPrefsChatConversationStore implements ChatConversationStore {
-  SharedPrefsChatConversationStore(
-    this._prefs, {
-    Uuid? uuid,
-  }) : _uuid = uuid ?? const Uuid();
+  SharedPrefsChatConversationStore(this._prefs, {Uuid? uuid})
+    : _uuid = uuid ?? const Uuid();
 
   final SharedPreferences _prefs;
   final Uuid _uuid;
@@ -24,36 +22,40 @@ class SharedPrefsChatConversationStore implements ChatConversationStore {
   @override
   Future<ChatStoreSnapshot> bootstrap() async {
     final index = _loadIndex();
-    if (index == null || index.summaries.isEmpty) {
+    if (index == null) {
       final initial = _buildConversationRecord();
-      await _saveConversationRecord(initial);
-      final nextIndex = _ChatStoreIndex(
-        schemaVersion: _schemaVersion,
-        activeConversationId: initial.summary.id,
-        summaries: <ChatConversationSummary>[initial.summary],
-      );
-      await _saveIndex(nextIndex);
       return ChatStoreSnapshot(
         activeConversation: initial,
-        conversationSummaries: nextIndex.summaries,
+        conversationSummaries: const <ChatConversationSummary>[],
       );
     }
 
-    final activeId = index.activeConversationId.isNotEmpty
-        ? index.activeConversationId
-        : index.summaries.first.id;
-    final activeConversation = _loadConversation(activeId) ?? _buildConversationRecord();
-    final nextSummaries = _upsertSummary(
-      index.summaries,
-      activeConversation.summary,
-    );
+    final baseSummaries = _sanitizeSummaries(index.summaries);
+    ChatConversationRecord activeConversation =
+        index.activeConversationId.isNotEmpty
+        ? (_loadConversation(index.activeConversationId) ??
+              _loadFirstAvailableConversation(baseSummaries) ??
+              _buildConversationRecord())
+        : (_loadFirstAvailableConversation(baseSummaries) ??
+              _buildConversationRecord());
+    var nextSummaries = baseSummaries;
+    if (_hasConversationContent(activeConversation.messages)) {
+      final summarized = _summarizeConversation(
+        activeConversation.summary,
+        activeConversation.messages,
+      );
+      activeConversation = activeConversation.copyWith(summary: summarized);
+      await _saveConversationRecord(activeConversation);
+      nextSummaries = _upsertSummary(nextSummaries, summarized);
+    }
     final nextIndex = _ChatStoreIndex(
       schemaVersion: _schemaVersion,
-      activeConversationId: activeConversation.summary.id,
+      activeConversationId: _hasConversationContent(activeConversation.messages)
+          ? activeConversation.summary.id
+          : '',
       summaries: nextSummaries,
     );
     await _saveIndex(nextIndex);
-    await _saveConversationRecord(activeConversation);
     return ChatStoreSnapshot(
       activeConversation: activeConversation,
       conversationSummaries: nextSummaries,
@@ -63,12 +65,16 @@ class SharedPrefsChatConversationStore implements ChatConversationStore {
   @override
   Future<ChatStoreSnapshot> createConversation() async {
     final index = _loadIndex() ?? _emptyIndex();
+    final nextSummaries = _sanitizeSummaries(index.summaries);
     final conversation = _buildConversationRecord();
-    await _saveConversationRecord(conversation);
-    final nextSummaries = _upsertSummary(index.summaries, conversation.summary);
     final nextIndex = _ChatStoreIndex(
       schemaVersion: _schemaVersion,
-      activeConversationId: conversation.summary.id,
+      activeConversationId:
+          nextSummaries.any(
+            (summary) => summary.id == index.activeConversationId,
+          )
+          ? index.activeConversationId
+          : '',
       summaries: nextSummaries,
     );
     await _saveIndex(nextIndex);
@@ -81,18 +87,27 @@ class SharedPrefsChatConversationStore implements ChatConversationStore {
   @override
   Future<ChatStoreSnapshot> activateConversation(String conversationId) async {
     final index = _loadIndex() ?? _emptyIndex();
-    final activeConversation = _loadConversation(conversationId) ?? _buildConversationRecord();
-    final nextSummaries = _upsertSummary(
-      index.summaries,
-      activeConversation.summary,
-    );
+    final baseSummaries = _sanitizeSummaries(index.summaries);
+    ChatConversationRecord activeConversation =
+        _loadConversation(conversationId) ?? _buildConversationRecord();
+    var nextSummaries = baseSummaries;
+    if (_hasConversationContent(activeConversation.messages)) {
+      final summarized = _summarizeConversation(
+        activeConversation.summary,
+        activeConversation.messages,
+      );
+      activeConversation = activeConversation.copyWith(summary: summarized);
+      await _saveConversationRecord(activeConversation);
+      nextSummaries = _upsertSummary(nextSummaries, summarized);
+    }
     final nextIndex = _ChatStoreIndex(
       schemaVersion: _schemaVersion,
-      activeConversationId: activeConversation.summary.id,
+      activeConversationId: _hasConversationContent(activeConversation.messages)
+          ? activeConversation.summary.id
+          : '',
       summaries: nextSummaries,
     );
     await _saveIndex(nextIndex);
-    await _saveConversationRecord(activeConversation);
     return ChatStoreSnapshot(
       activeConversation: activeConversation,
       conversationSummaries: nextSummaries,
@@ -100,8 +115,63 @@ class SharedPrefsChatConversationStore implements ChatConversationStore {
   }
 
   @override
+  Future<ChatStoreSnapshot> renameConversationTitle({
+    required String conversationId,
+    required String title,
+  }) async {
+    final normalized = title.trim();
+    if (normalized.isEmpty) {
+      throw StateError('会话标题不能为空。');
+    }
+    final index = _loadIndex() ?? _emptyIndex();
+    final targetConversation = _loadConversation(conversationId);
+    if (targetConversation == null) {
+      throw StateError('Conversation "$conversationId" does not exist.');
+    }
+    if (!_hasConversationContent(targetConversation.messages)) {
+      throw StateError('空会话不支持重命名。');
+    }
+    final updatedSummary = targetConversation.summary.copyWith(
+      title: _truncate(normalized, maxLength: 32),
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+      isTitleManuallyEdited: true,
+    );
+    final updatedConversation = targetConversation.copyWith(
+      summary: updatedSummary,
+    );
+    await _saveConversationRecord(updatedConversation);
+    final nextSummaries = _upsertSummary(
+      _sanitizeSummaries(index.summaries),
+      updatedSummary,
+    );
+
+    final currentActiveId = index.activeConversationId.isEmpty
+        ? updatedSummary.id
+        : index.activeConversationId;
+    final nextActiveConversation = currentActiveId == updatedSummary.id
+        ? updatedConversation
+        : (_loadConversation(currentActiveId) ??
+              _loadFirstAvailableConversation(nextSummaries) ??
+              updatedConversation);
+    final nextIndex = _ChatStoreIndex(
+      schemaVersion: _schemaVersion,
+      activeConversationId:
+          _hasConversationContent(nextActiveConversation.messages)
+          ? nextActiveConversation.summary.id
+          : '',
+      summaries: nextSummaries,
+    );
+    await _saveIndex(nextIndex);
+    return ChatStoreSnapshot(
+      activeConversation: nextActiveConversation,
+      conversationSummaries: nextSummaries,
+    );
+  }
+
+  @override
   Future<void> saveConversation(ChatConversationRecord conversation) async {
     final index = _loadIndex() ?? _emptyIndex();
+    final baseSummaries = _sanitizeSummaries(index.summaries);
     final updatedSummary = _summarizeConversation(
       conversation.summary.copyWith(
         updatedAtMs: DateTime.now().millisecondsSinceEpoch,
@@ -109,11 +179,37 @@ class SharedPrefsChatConversationStore implements ChatConversationStore {
       conversation.messages,
     );
     final nextConversation = conversation.copyWith(summary: updatedSummary);
+    if (!_hasConversationContent(nextConversation.messages)) {
+      await _removeConversationRecord(nextConversation.summary.id);
+      final nextSummaries = baseSummaries
+          .where((summary) => summary.id != nextConversation.summary.id)
+          .toList(growable: false);
+      final nextActiveId =
+          index.activeConversationId == nextConversation.summary.id
+          ? (nextSummaries.isEmpty ? '' : nextSummaries.first.id)
+          : (nextSummaries.any(
+                  (summary) => summary.id == index.activeConversationId,
+                )
+                ? index.activeConversationId
+                : '');
+      final nextIndex = _ChatStoreIndex(
+        schemaVersion: _schemaVersion,
+        activeConversationId: nextActiveId,
+        summaries: nextSummaries,
+      );
+      await _saveIndex(nextIndex);
+      return;
+    }
+
     await _saveConversationRecord(nextConversation);
-    final nextSummaries = _upsertSummary(index.summaries, updatedSummary);
+    final nextSummaries = _upsertSummary(baseSummaries, updatedSummary);
     final nextIndex = _ChatStoreIndex(
       schemaVersion: _schemaVersion,
-      activeConversationId: index.activeConversationId.isEmpty
+      activeConversationId:
+          index.activeConversationId.isEmpty ||
+              !nextSummaries.any(
+                (summary) => summary.id == index.activeConversationId,
+              )
           ? updatedSummary.id
           : index.activeConversationId,
       summaries: nextSummaries,
@@ -137,15 +233,21 @@ class SharedPrefsChatConversationStore implements ChatConversationStore {
     );
   }
 
-  Future<void> _saveConversationRecord(ChatConversationRecord conversation) async {
+  Future<void> _saveConversationRecord(
+    ChatConversationRecord conversation,
+  ) async {
     final key = _conversationKey(conversation.summary.id);
-    final encoded = jsonEncode(
-      <String, dynamic>{
-        'summary': conversation.summary.toJson(),
-        'messages': conversation.messages.map((message) => message.toJson()).toList(),
-      },
-    );
+    final encoded = jsonEncode(<String, dynamic>{
+      'summary': conversation.summary.toJson(),
+      'messages': conversation.messages
+          .map((message) => message.toJson())
+          .toList(),
+    });
     await _prefs.setString(key, encoded);
+  }
+
+  Future<void> _removeConversationRecord(String conversationId) async {
+    await _prefs.remove(_conversationKey(conversationId));
   }
 
   ChatConversationRecord? _loadConversation(String conversationId) {
@@ -203,11 +305,10 @@ class SharedPrefsChatConversationStore implements ChatConversationStore {
     ChatConversationSummary summary,
   ) {
     final next = <ChatConversationSummary>[
-      summary,
+      if (_isPersistableSummary(summary)) summary,
       ...existing.where((item) => item.id != summary.id),
     ];
-    next.sort((left, right) => right.updatedAtMs.compareTo(left.updatedAtMs));
-    return next;
+    return _sanitizeSummaries(next);
   }
 
   ChatConversationSummary _summarizeConversation(
@@ -221,16 +322,52 @@ class SharedPrefsChatConversationStore implements ChatConversationStore {
     final preview = messages.reversed
         .map((message) => message.text.trim())
         .firstWhere((text) => text.isNotEmpty, orElse: () => '');
+    final title = base.isTitleManuallyEdited
+        ? base.title
+        : (firstUserText.isEmpty
+              ? 'New chat'
+              : _truncate(firstUserText, maxLength: 32));
     return base.copyWith(
-      title: firstUserText.isEmpty
-          ? 'New chat'
-          : _truncate(firstUserText, maxLength: 32),
+      title: title,
       previewText: preview.isEmpty ? '' : _truncate(preview, maxLength: 60),
       messageCount: messages.length,
     );
   }
 
-  String _conversationKey(String conversationId) => 'chat_conversation_$conversationId';
+  String _conversationKey(String conversationId) =>
+      'chat_conversation_$conversationId';
+
+  ChatConversationRecord? _loadFirstAvailableConversation(
+    List<ChatConversationSummary> summaries,
+  ) {
+    for (final summary in summaries) {
+      final record = _loadConversation(summary.id);
+      if (record != null) {
+        return record;
+      }
+    }
+    return null;
+  }
+
+  List<ChatConversationSummary> _sanitizeSummaries(
+    List<ChatConversationSummary> summaries,
+  ) {
+    final next = summaries.where(_isPersistableSummary).toList(growable: false);
+    final sorted = List<ChatConversationSummary>.from(next);
+    sorted.sort((left, right) => right.updatedAtMs.compareTo(left.updatedAtMs));
+    return sorted;
+  }
+
+  bool _isPersistableSummary(ChatConversationSummary summary) {
+    return summary.messageCount > 0;
+  }
+
+  bool _hasConversationContent(List<ChatMessage> messages) {
+    return messages.any(
+      (message) =>
+          message.text.trim().isNotEmpty || message.attachments.isNotEmpty,
+    );
+  }
 
   String _truncate(String value, {required int maxLength}) {
     final normalized = value.replaceAll('\n', ' ').trim();

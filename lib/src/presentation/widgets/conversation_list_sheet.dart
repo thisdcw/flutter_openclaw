@@ -7,14 +7,15 @@ class ConversationListSheet extends StatelessWidget {
     super.key,
     required this.conversations,
     required this.activeConversationId,
-    required this.onCreateConversation,
     required this.onSelectConversation,
+    required this.onRenameConversation,
   });
 
   final List<ChatConversationSummary> conversations;
   final String? activeConversationId;
-  final Future<void> Function() onCreateConversation;
   final Future<void> Function(String conversationId) onSelectConversation;
+  final Future<void> Function(String conversationId, String title)
+  onRenameConversation;
 
   @override
   Widget build(BuildContext context) {
@@ -26,26 +27,9 @@ class ConversationListSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Chats',
-                    style: theme.textTheme.titleLarge,
-                  ),
-                ),
-                FilledButton.icon(
-                  onPressed: () async {
-                    await onCreateConversation();
-                    if (context.mounted) {
-                      Navigator.of(context).pop();
-                    }
-                  },
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('New'),
-                ),
-              ],
-            ),
+            Text('Chats', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text('点击切换会话，右侧按钮可重命名。', style: theme.textTheme.bodySmall),
             const SizedBox(height: 14),
             SizedBox(
               height: MediaQuery.of(context).size.height * 0.62,
@@ -93,11 +77,33 @@ class ConversationListSheet extends StatelessWidget {
                                     ),
                                     child: Text(
                                       'Active',
-                                      style: theme.textTheme.labelSmall?.copyWith(
-                                        color: theme.colorScheme.onPrimary,
-                                      ),
+                                      style: theme.textTheme.labelSmall
+                                          ?.copyWith(
+                                            color: theme.colorScheme.onPrimary,
+                                          ),
                                     ),
                                   ),
+                                IconButton(
+                                  onPressed: () async {
+                                    final renamed = await _promptRenameDialog(
+                                      context,
+                                      initialTitle: conversation.title,
+                                    );
+                                    if (renamed == null) {
+                                      return;
+                                    }
+                                    await onRenameConversation(
+                                      conversation.id,
+                                      renamed,
+                                    );
+                                    if (!context.mounted) {
+                                      return;
+                                    }
+                                    Navigator.of(context).pop();
+                                  },
+                                  icon: const Icon(Icons.edit_rounded),
+                                  tooltip: 'Rename',
+                                ),
                               ],
                             ),
                             const SizedBox(height: 6),
@@ -121,5 +127,55 @@ class ConversationListSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<String?> _promptRenameDialog(
+    BuildContext context, {
+    required String initialTitle,
+  }) async {
+    final controller = TextEditingController(text: initialTitle);
+    final nextTitle = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('重命名会话'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLength: 32,
+            decoration: const InputDecoration(hintText: '输入会话标题'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(controller.text);
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    if (!context.mounted) {
+      return null;
+    }
+    if (nextTitle == null) {
+      return null;
+    }
+    final normalized = nextTitle.trim();
+    if (normalized.isEmpty) {
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(const SnackBar(content: Text('会话标题不能为空。')));
+      return null;
+    }
+    return normalized;
   }
 }

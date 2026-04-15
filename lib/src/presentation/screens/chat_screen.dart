@@ -46,6 +46,15 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  static const List<_ChatModelOption> _supportedModels = <_ChatModelOption>[
+    _ChatModelOption(id: 'gemini-3-flash-preview', label: 'flash'),
+    _ChatModelOption(
+      id: 'gemini-3.1-flash-image-preview',
+      label: 'flash-image',
+    ),
+    _ChatModelOption(id: 'gemini-3.1-flash-lite', label: 'flash-lite'),
+  ];
+
   late final TextEditingController composerController;
   late final FocusNode composerFocusNode;
   late final ScrollController messageScrollController;
@@ -56,6 +65,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String lastObservedMessageSignature = '';
   bool autoScrollScheduled = false;
   bool pendingForceScroll = false;
+  String selectedModelId = 'gemini-3-flash-preview';
 
   @override
   void initState() {
@@ -82,31 +92,44 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([
+      animation: Listenable.merge(<Listenable>[
         widget.connectionController,
         widget.chatController,
+        if (widget.settingsController != null) widget.settingsController!,
       ]),
       builder: (context, _) {
         final theme = Theme.of(context);
         final l10n = AppLocalizations.of(context)!;
         final connectionStatus = widget.connectionController.status;
+        final canvasEntryEnabled =
+            widget.settingsController?.config.canvasEntryEnabled ?? true;
         final isConnecting = _isConnectingPhase(connectionStatus.phase);
         final showConnectionStrip = !connectionStatus.isReady;
         final isPairingFailure =
-            connectionStatus.failure?.type == GatewayFailureType.pairingRequired;
+            connectionStatus.failure?.type ==
+            GatewayFailureType.pairingRequired;
         final blockedReason = localizedBlockedReason(
           l10n,
           widget.connectionController.sendBlockedReason,
         );
         final messages = widget.chatController.messages;
-        final activeConversation = widget.chatController.activeConversationSummary;
+        final activeConversation =
+            widget.chatController.activeConversationSummary;
         final trimmedDraft = composerController.text.trimLeft();
         final commandHint = analyzeChatDraft(composerController.text).hintKind;
         final commandSuggestions = trimmedDraft.startsWith('/')
             ? filterSlashSuggestions(composerController.text)
             : const <ChatCommandSuggestion>[];
-        final hasDraftContent = composerController.text.trim().isNotEmpty ||
+        final hasDraftContent =
+            composerController.text.trim().isNotEmpty ||
             pendingAttachments.isNotEmpty;
+        final composerActionsEnabled =
+            widget.connectionController.canSend &&
+            !widget.chatController.isSending;
+        final selectedModel = _supportedModels.firstWhere(
+          (option) => option.id == selectedModelId,
+          orElse: () => _supportedModels.first,
+        );
         final connectionTitle = _connectionTitle(
           l10n,
           connectionStatus,
@@ -118,8 +141,12 @@ class _ChatScreenState extends State<ChatScreen> {
           isConnecting,
         );
         final hasCanvasHost =
-            (connectionStatus.canvasCapability.canvasHostUrl ?? '').trim().isNotEmpty;
-        final canOpenCanvas = connectionStatus.isReady &&
+            (connectionStatus.canvasCapability.canvasHostUrl ?? '')
+                .trim()
+                .isNotEmpty;
+        final canOpenCanvas =
+            canvasEntryEnabled &&
+            connectionStatus.isReady &&
             hasCanvasHost &&
             widget.sendCanvasUserActionUseCase != null &&
             widget.settingsController != null;
@@ -130,51 +157,55 @@ class _ChatScreenState extends State<ChatScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            leading: IconButton(
-              onPressed: _openConversationList,
-              icon: const Icon(Icons.chat_bubble_outline_rounded),
-              tooltip: 'Chats',
-            ),
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            centerTitle: true,
+            leadingWidth: canvasEntryEnabled ? 104 : 56,
+            leading: Row(
               children: [
-                Text(
-                  activeConversation?.title ?? l10n.chatScreenTitle,
-                  style: theme.textTheme.titleMedium,
+                IconButton(
+                  onPressed: _createConversation,
+                  icon: const Icon(Icons.add_comment_outlined),
+                  tooltip: 'New chat',
                 ),
-                if ((activeConversation?.sessionId ?? '').isNotEmpty)
-                  Text(
-                    activeConversation!.sessionId,
-                    style: theme.textTheme.labelSmall,
+                if (canvasEntryEnabled)
+                  IconButton(
+                    onPressed: canOpenCanvas
+                        ? _openCanvas
+                        : connectionStatus.isReady && hasCanvasHost
+                        ? null
+                        : _showCanvasUnavailableHint,
+                    icon: const Icon(Icons.dashboard_customize_rounded),
+                    tooltip: canOpenCanvas
+                        ? 'Open canvas host'
+                        : 'Canvas unavailable (missing structured canvasHostUrl)',
                   ),
               ],
             ),
-            actions: [
-              IconButton(
-                onPressed: () async {
-                  await widget.chatController.createConversation();
-                  if (!mounted) {
-                    return;
-                  }
-                  composerController.clear();
-                  setState(pendingAttachments.clear);
-                },
-                icon: const Icon(Icons.add_comment_outlined),
-                tooltip: 'New chat',
+            title: InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: _openConversationList,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        activeConversation?.title ?? l10n.chatScreenTitle,
+                        style: theme.textTheme.titleMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.expand_more_rounded, size: 18),
+                  ],
+                ),
               ),
+            ),
+            actions: [
               StatusBadge(label: widget.connectionController.phase),
               const SizedBox(width: 6),
-              IconButton(
-                onPressed: canOpenCanvas
-                    ? _openCanvas
-                    : connectionStatus.isReady && hasCanvasHost
-                        ? null
-                        : _showCanvasUnavailableHint,
-                icon: const Icon(Icons.dashboard_customize_rounded),
-                tooltip: canOpenCanvas
-                    ? 'Open canvas host'
-                    : 'Canvas unavailable (missing structured canvasHostUrl)',
-              ),
               IconButton(
                 onPressed: widget.settingsController == null
                     ? null
@@ -204,10 +235,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         title: connectionTitle,
                         subtitle: connectionSubtitle,
                         showButton: !isConnecting,
-                        buttonLabel: connectionStatus.phase == ConnectionPhase.failed
+                        buttonLabel:
+                            connectionStatus.phase == ConnectionPhase.failed
                             ? '重连'
                             : isPairingFailure
-                                ? '重试'
+                            ? '重试'
                             : l10n.connectionButtonLabel,
                         emphasized:
                             connectionStatus.phase == ConnectionPhase.failed,
@@ -228,7 +260,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       const SizedBox(height: 8),
                     ],
-                    if (connectionStatus.isReady && !hasCanvasHost) ...[
+                    if (canvasEntryEnabled &&
+                        connectionStatus.isReady &&
+                        !hasCanvasHost) ...[
                       const _InfoBanner(
                         message:
                             'Canvas capability unavailable: missing structured canvasHostUrl, chat mode stays active.',
@@ -263,6 +297,17 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     const SizedBox(height: 10),
                     Padding(
+                      padding: const EdgeInsets.fromLTRB(2, 0, 2, 6),
+                      child: _ComposerControlBar(
+                        enabled: composerActionsEnabled,
+                        modelLabel: selectedModel.label,
+                        modelOptions: _supportedModels,
+                        selectedModelId: selectedModelId,
+                        onModelSelected: _handleModelSelected,
+                        onPickImages: _pickImages,
+                      ),
+                    ),
+                    Padding(
                       padding: const EdgeInsets.fromLTRB(2, 0, 2, 2),
                       child: ChatComposer(
                         controller: composerController,
@@ -274,7 +319,6 @@ class _ChatScreenState extends State<ChatScreen> {
                         commandSuggestions: commandSuggestions,
                         commandHintKind: commandHint,
                         onSelectCommandSuggestion: _applyCommandTemplate,
-                        onPickImages: _pickImages,
                         onRemoveAttachment: _removeAttachment,
                         onSend: () async {
                           final text = composerController.text;
@@ -295,6 +339,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             ChatDraft(
                               text: text,
                               attachments: pendingAttachments,
+                              preferredModelId: selectedModelId,
                             ),
                           );
                           if (!mounted) {
@@ -347,8 +392,11 @@ class _ChatScreenState extends State<ChatScreen> {
       MaterialPageRoute<void>(
         builder: (context) => CanvasScreen(
           initialCanvasHostUrl: canvasHostUrl,
-          canvasCapability:
-              widget.connectionController.status.canvasCapability.canvasCapability,
+          canvasCapability: widget
+              .connectionController
+              .status
+              .canvasCapability
+              .canvasCapability,
           configProvider: () => settingsController.config,
           sendCanvasUserActionUseCase: sendCanvasUserActionUseCase,
         ),
@@ -376,15 +424,8 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (context) {
         return ConversationListSheet(
           conversations: widget.chatController.conversationSummaries,
-          activeConversationId: widget.chatController.activeConversationSummary?.id,
-          onCreateConversation: () async {
-            await widget.chatController.createConversation();
-            if (!mounted) {
-              return;
-            }
-            composerController.clear();
-            setState(pendingAttachments.clear);
-          },
+          activeConversationId:
+              widget.chatController.activeConversationSummary?.id,
           onSelectConversation: (conversationId) async {
             await widget.chatController.switchConversation(conversationId);
             if (!mounted) {
@@ -393,9 +434,46 @@ class _ChatScreenState extends State<ChatScreen> {
             composerController.clear();
             setState(pendingAttachments.clear);
           },
+          onRenameConversation: _handleRenameConversation,
         );
       },
     );
+  }
+
+  Future<void> _createConversation() async {
+    await widget.chatController.createConversation();
+    if (!mounted) {
+      return;
+    }
+    composerController.clear();
+    setState(pendingAttachments.clear);
+  }
+
+  Future<void> _handleRenameConversation(
+    String conversationId,
+    String nextTitle,
+  ) async {
+    try {
+      await widget.chatController.renameConversationTitle(
+        conversationId: conversationId,
+        title: nextTitle,
+      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(const SnackBar(content: Text('会话标题已更新。')));
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Bad state: ', '')),
+        ),
+      );
+    }
   }
 
   void _handleComposerChange() {
@@ -403,6 +481,21 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
     setState(() {});
+  }
+
+  void _handleModelSelected(String modelId) {
+    if (modelId == selectedModelId) {
+      return;
+    }
+    setState(() {
+      selectedModelId = modelId;
+    });
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text('模型已切换：`/model $modelId`'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   void _applyCommandTemplate(String template) {
@@ -489,8 +582,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final kind = message == l10n.pickerErrorChannel
         ? AppErrorKind.pickerChannel
         : message == l10n.pickerErrorUnavailable
-            ? AppErrorKind.pickerUnavailable
-            : AppErrorKind.pickerGeneric;
+        ? AppErrorKind.pickerUnavailable
+        : AppErrorKind.pickerGeneric;
     widget.chatController.showInlineError(
       kind: kind,
       rawMessage: message,
@@ -660,8 +753,118 @@ class _InfoBanner extends StatelessWidget {
       ),
       child: Text(
         message,
-        style:
-            Theme.of(context).textTheme.bodyMedium?.copyWith(color: textColor),
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: textColor),
+      ),
+    );
+  }
+}
+
+class _ChatModelOption {
+  const _ChatModelOption({required this.id, required this.label});
+
+  final String id;
+  final String label;
+}
+
+class _ComposerControlBar extends StatelessWidget {
+  const _ComposerControlBar({
+    required this.enabled,
+    required this.modelLabel,
+    required this.modelOptions,
+    required this.selectedModelId,
+    required this.onModelSelected,
+    required this.onPickImages,
+  });
+
+  final bool enabled;
+  final String modelLabel;
+  final List<_ChatModelOption> modelOptions;
+  final String selectedModelId;
+  final ValueChanged<String> onModelSelected;
+  final Future<void> Function() onPickImages;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.82),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.55)),
+      ),
+      child: Row(
+        children: [
+          PopupMenuButton<String>(
+            enabled: enabled,
+            onSelected: onModelSelected,
+            tooltip: 'Switch model',
+            itemBuilder: (context) {
+              return modelOptions
+                  .map(
+                    (option) => PopupMenuItem<String>(
+                      value: option.id,
+                      child: Row(
+                        children: [
+                          Expanded(child: Text(option.label)),
+                          if (option.id == selectedModelId)
+                            Icon(
+                              Icons.check_rounded,
+                              size: 16,
+                              color: theme.colorScheme.primary,
+                            ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(growable: false);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withOpacity(
+                  0.5,
+                ),
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(
+                  color: theme.colorScheme.outline.withOpacity(0.65),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    modelLabel,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  const Icon(Icons.expand_more_rounded, size: 16),
+                ],
+              ),
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            onPressed: enabled
+                ? () {
+                    unawaited(onPickImages());
+                  }
+                : null,
+            icon: const Icon(Icons.add_rounded),
+            tooltip: AppLocalizations.of(context)!.addImagesTooltip,
+            style: IconButton.styleFrom(
+              minimumSize: const Size(32, 32),
+              padding: const EdgeInsets.all(4),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest
+                  .withOpacity(0.55),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -785,10 +988,7 @@ class _DiscoveryCommandChip extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              description,
-              style: theme.textTheme.bodySmall,
-            ),
+            Text(description, style: theme.textTheme.bodySmall),
           ],
         ),
       ),
@@ -823,10 +1023,7 @@ class _ConnectionStrip extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: <Color>[
-            Color(0xFF2F6BFF),
-            Color(0xFF1F57DF),
-          ],
+          colors: <Color>[Color(0xFF2F6BFF), Color(0xFF1F57DF)],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFF5E8BFF)),
@@ -880,8 +1077,10 @@ class _ConnectionStrip extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: const Color(0xFF2F6BFF),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -893,8 +1092,10 @@ class _ConnectionStrip extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
                   side: BorderSide(color: Colors.white.withOpacity(0.62)),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),

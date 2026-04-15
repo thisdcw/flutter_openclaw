@@ -4,9 +4,13 @@ class BootstrapImportSheet extends StatefulWidget {
   const BootstrapImportSheet({
     super.key,
     required this.onSubmit,
+    this.title = '导入配对码',
+    this.submitLabel = '导入',
   });
 
   final ValueChanged<String> onSubmit;
+  final String title;
+  final String submitLabel;
 
   @override
   State<BootstrapImportSheet> createState() => _BootstrapImportSheetState();
@@ -34,9 +38,9 @@ class _BootstrapImportSheetState extends State<BootstrapImportSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '导入配对码',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          Text(
+            widget.title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -52,7 +56,7 @@ class _BootstrapImportSheetState extends State<BootstrapImportSheet> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () => widget.onSubmit(_controller.text),
-              child: const Text('导入'),
+              child: Text(widget.submitLabel),
             ),
           ),
         ],

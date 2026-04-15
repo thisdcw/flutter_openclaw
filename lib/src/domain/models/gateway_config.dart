@@ -3,12 +3,14 @@ class GatewayConfig {
   final String sessionId;
   final int timeoutMs;
   final String locale;
+  final bool canvasEntryEnabled;
 
   const GatewayConfig({
     required this.gatewayUrl,
     required this.sessionId,
     required this.timeoutMs,
     required this.locale,
+    required this.canvasEntryEnabled,
   });
 
   GatewayConfig copyWith({
@@ -16,12 +18,14 @@ class GatewayConfig {
     String? sessionId,
     int? timeoutMs,
     String? locale,
+    bool? canvasEntryEnabled,
   }) {
     return GatewayConfig(
       gatewayUrl: gatewayUrl ?? this.gatewayUrl,
       sessionId: sessionId ?? this.sessionId,
       timeoutMs: timeoutMs ?? this.timeoutMs,
       locale: locale ?? this.locale,
+      canvasEntryEnabled: canvasEntryEnabled ?? this.canvasEntryEnabled,
     );
   }
 
@@ -31,6 +35,7 @@ class GatewayConfig {
       'sessionId': sessionId,
       'timeoutMs': timeoutMs,
       'locale': locale,
+      'canvasEntryEnabled': canvasEntryEnabled,
     };
   }
 
@@ -40,6 +45,11 @@ class GatewayConfig {
       sessionId: _string(json, 'sessionId'),
       timeoutMs: _int(json, 'timeoutMs'),
       locale: _string(json, 'locale'),
+      canvasEntryEnabled: _boolWithFallback(
+        json,
+        'canvasEntryEnabled',
+        fallback: true,
+      ),
     );
   }
 
@@ -50,21 +60,19 @@ class GatewayConfig {
         other.gatewayUrl == gatewayUrl &&
         other.sessionId == sessionId &&
         other.timeoutMs == timeoutMs &&
-        other.locale == locale;
+        other.locale == locale &&
+        other.canvasEntryEnabled == canvasEntryEnabled;
   }
 
   @override
-  int get hashCode => Object.hash(
-        gatewayUrl,
-        sessionId,
-        timeoutMs,
-        locale,
-      );
+  int get hashCode =>
+      Object.hash(gatewayUrl, sessionId, timeoutMs, locale, canvasEntryEnabled);
 
   @override
   String toString() {
     return 'GatewayConfig(gatewayUrl: $gatewayUrl, sessionId: $sessionId, '
-        'timeoutMs: $timeoutMs, locale: $locale)';
+        'timeoutMs: $timeoutMs, locale: $locale, '
+        'canvasEntryEnabled: $canvasEntryEnabled)';
   }
 
   static String _string(Map<String, dynamic> json, String key) {
@@ -84,5 +92,20 @@ class GatewayConfig {
       return value.toInt();
     }
     throw FormatException('GatewayConfig: "$key" must be an integer.');
+  }
+
+  static bool _boolWithFallback(
+    Map<String, dynamic> json,
+    String key, {
+    required bool fallback,
+  }) {
+    final value = json[key];
+    if (value == null) {
+      return fallback;
+    }
+    if (value is bool) {
+      return value;
+    }
+    throw FormatException('GatewayConfig: "$key" must be a bool.');
   }
 }

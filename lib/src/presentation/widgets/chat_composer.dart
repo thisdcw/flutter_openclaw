@@ -16,7 +16,6 @@ class ChatComposer extends StatelessWidget {
     required this.hasContent,
     required this.isSending,
     required this.attachments,
-    required this.onPickImages,
     required this.onRemoveAttachment,
     required this.onSend,
     required this.commandSuggestions,
@@ -30,7 +29,6 @@ class ChatComposer extends StatelessWidget {
   final bool hasContent;
   final bool isSending;
   final List<SelectedImageAttachment> attachments;
-  final Future<void> Function() onPickImages;
   final ValueChanged<SelectedImageAttachment> onRemoveAttachment;
   final Future<void> Function() onSend;
   final List<ChatCommandSuggestion> commandSuggestions;
@@ -45,10 +43,10 @@ class ChatComposer extends StatelessWidget {
     final sendEnabled = fieldEnabled && hasContent;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.96),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: theme.colorScheme.outline.withOpacity(0.9)),
         boxShadow: const <BoxShadow>[
           BoxShadow(
@@ -80,27 +78,13 @@ class ChatComposer extends StatelessWidget {
           ],
           Row(
             children: [
-              IconButton(
-                onPressed: fieldEnabled
-                    ? () {
-                        unawaited(onPickImages());
-                      }
-                    : null,
-                icon: const Icon(Icons.photo_library_rounded),
-                tooltip: l10n.addImagesTooltip,
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(36, 36),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-              const SizedBox(width: 4),
               Expanded(
                 child: TextField(
                   controller: controller,
                   focusNode: focusNode,
                   enabled: fieldEnabled,
                   minLines: 1,
-                  maxLines: 4,
+                  maxLines: 3,
                   decoration: InputDecoration(
                     hintText: l10n.composerModeHint,
                     border: InputBorder.none,
@@ -110,7 +94,7 @@ class ChatComposer extends StatelessWidget {
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 4,
-                      vertical: 8,
+                      vertical: 4,
                     ),
                   ),
                 ),
@@ -124,8 +108,8 @@ class ChatComposer extends StatelessWidget {
                     : null,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
+                    horizontal: 12,
+                    vertical: 8,
                   ),
                   backgroundColor: const Color(0xFF2F6BFF),
                   foregroundColor: Colors.white,
@@ -162,11 +146,7 @@ class _CommandHint extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.bolt,
-            size: 16,
-            color: primary,
-          ),
+          Icon(Icons.bolt, size: 16, color: primary),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -208,9 +188,7 @@ class _CommandSuggestionPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.78),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.65),
-        ),
+        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.65)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

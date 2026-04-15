@@ -10,4 +10,5 @@ const GatewayConfig defaultGatewayConfig = GatewayConfig(
   sessionId: '',
   timeoutMs: 60000,
   locale: 'zh-CN',
+  canvasEntryEnabled: true,
 );

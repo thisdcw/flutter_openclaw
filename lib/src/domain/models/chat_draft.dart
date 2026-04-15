@@ -50,17 +50,32 @@ class ChatDraft {
   ChatDraft({
     required this.text,
     required List<SelectedImageAttachment> attachments,
+    this.preferredModelId,
   }) : attachments = List<SelectedImageAttachment>.unmodifiable(attachments);
 
   final String text;
   final List<SelectedImageAttachment> attachments;
+  final String? preferredModelId;
 
   String get normalizedText => text.trim();
 
   bool get hasSendableContent =>
       normalizedText.isNotEmpty || attachments.isNotEmpty;
 
-  String toGatewayMessage() => normalizedText;
+  String toGatewayMessage() {
+    final normalized = normalizedText;
+    final model = preferredModelId?.trim() ?? '';
+    if (model.isEmpty) {
+      return normalized;
+    }
+    if (normalized.startsWith('/')) {
+      return normalized;
+    }
+    if (normalized.isEmpty) {
+      return '/model $model';
+    }
+    return '/model $model\n$normalized';
+  }
 
   List<GatewayChatAttachment> toGatewayAttachments() => attachments
       .map(GatewayChatAttachment.fromSelectedImage)
@@ -71,15 +86,18 @@ class ChatDraft {
     if (identical(this, other)) return true;
     return other is ChatDraft &&
         other.text == text &&
+        other.preferredModelId == preferredModelId &&
         _listEquality.equals(other.attachments, attachments);
   }
 
   @override
-  int get hashCode => Object.hash(text, _listEquality.hash(attachments));
+  int get hashCode =>
+      Object.hash(text, preferredModelId, _listEquality.hash(attachments));
 
   @override
   String toString() {
-    return 'ChatDraft(text: $text, attachments: ${attachments.length})';
+    return 'ChatDraft(text: $text, model: $preferredModelId, attachments: '
+        '${attachments.length})';
   }
 
   static const ListEquality<SelectedImageAttachment> _listEquality =

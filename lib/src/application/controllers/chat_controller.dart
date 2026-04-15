@@ -23,18 +23,18 @@ class ChatController extends ChangeNotifier {
     AppErrorController? appErrorController,
     Future<void> Function(String sessionId)? activeSessionSync,
     bool isStub = false,
-  })  : _chatRepository = chatRepository,
-        _sendChatMessageUseCase = sendChatMessageUseCase,
-        _configProvider = configProvider,
-        _conversationStore = conversationStore,
-        _conversationSummaries =
-            List<ChatConversationSummary>.from(
-              initialSnapshot?.conversationSummaries ?? const <ChatConversationSummary>[],
-            ),
-        _activeConversation = initialSnapshot?.activeConversation,
-        _appErrorController = appErrorController,
-        _activeSessionSync = activeSessionSync,
-        _isStub = isStub;
+  }) : _chatRepository = chatRepository,
+       _sendChatMessageUseCase = sendChatMessageUseCase,
+       _configProvider = configProvider,
+       _conversationStore = conversationStore,
+       _conversationSummaries = List<ChatConversationSummary>.from(
+         initialSnapshot?.conversationSummaries ??
+             const <ChatConversationSummary>[],
+       ),
+       _activeConversation = initialSnapshot?.activeConversation,
+       _appErrorController = appErrorController,
+       _activeSessionSync = activeSessionSync,
+       _isStub = isStub;
 
   factory ChatController.fake() => ChatController(isStub: true);
 
@@ -57,13 +57,14 @@ class ChatController extends ChangeNotifier {
   List<ChatConversationSummary> get conversationSummaries =>
       List<ChatConversationSummary>.unmodifiable(_conversationSummaries);
 
-  ChatConversationSummary? get activeConversationSummary => _activeConversation?.summary;
+  ChatConversationSummary? get activeConversationSummary =>
+      _activeConversation?.summary;
 
   String get activeSessionId => _activeConversation?.summary.sessionId ?? '';
 
   List<ChatMessage> get messages => List<ChatMessage>.unmodifiable(
-        _activeConversation?.messages ?? const <ChatMessage>[],
-      );
+    _activeConversation?.messages ?? const <ChatMessage>[],
+  );
 
   Future<void> createConversation() async {
     final store = _conversationStore;
@@ -101,6 +102,55 @@ class ChatController extends ChangeNotifier {
     await _syncActiveSession();
   }
 
+  Future<void> renameConversationTitle({
+    required String conversationId,
+    required String title,
+  }) async {
+    final normalized = title.trim();
+    if (normalized.isEmpty) {
+      throw StateError('会话标题不能为空。');
+    }
+    final store = _conversationStore;
+    if (_isStub || store == null) {
+      final summaryIndex = _conversationSummaries.indexWhere(
+        (summary) => summary.id == conversationId,
+      );
+      if (summaryIndex == -1) {
+        return;
+      }
+      final updatedSummary = _conversationSummaries[summaryIndex].copyWith(
+        title: _truncate(normalized, maxLength: 32),
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+        isTitleManuallyEdited: true,
+      );
+      _conversationSummaries[summaryIndex] = updatedSummary;
+      if (_activeConversation?.summary.id == conversationId) {
+        _activeConversation = _activeConversation?.copyWith(
+          summary: updatedSummary,
+        );
+      }
+      _replaceSummary(updatedSummary);
+      notifyListeners();
+      return;
+    }
+    final snapshot = await store.renameConversationTitle(
+      conversationId: conversationId,
+      title: normalized,
+    );
+    _replaceActiveConversation(snapshot);
+  }
+
+  Future<void> renameActiveConversationTitle(String title) async {
+    final active = _activeConversation;
+    if (active == null) {
+      return;
+    }
+    await renameConversationTitle(
+      conversationId: active.summary.id,
+      title: title,
+    );
+  }
+
   Future<void> send(ChatDraft draft) async {
     if (!draft.hasSendableContent) {
       openClawLog('ChatController', 'send ignored: empty draft');
@@ -108,8 +158,9 @@ class ChatController extends ChangeNotifier {
     }
 
     final normalized = draft.normalizedText;
-    final shouldCreateFreshConversation =
-        _shouldCreateFreshConversation(normalized);
+    final shouldCreateFreshConversation = _shouldCreateFreshConversation(
+      normalized,
+    );
     openClawLog(
       'ChatController',
       'send begin',
@@ -172,10 +223,7 @@ class ChatController extends ChangeNotifier {
               config: configProvider(),
               sessionId: sessionId,
             )
-          : repository!.sendMessage(
-              draft,
-              sessionId: sessionId,
-            );
+          : repository!.sendMessage(draft, sessionId: sessionId);
 
       await for (final message in stream) {
         openClawLog(
@@ -205,17 +253,13 @@ class ChatController extends ChangeNotifier {
       );
       if (errorNotice!.kind == AppErrorKind.unexpected) {
         _appErrorController?.publish(
-          errorNotice!.copyWith(
-            presentation: AppErrorPresentation.global,
-          ),
+          errorNotice!.copyWith(presentation: AppErrorPresentation.global),
         );
       }
       openClawLog(
         'ChatController',
         'send failed',
-        fields: <String, Object?>{
-          'error': rawReason,
-        },
+        fields: <String, Object?>{'error': rawReason},
       );
       notifyListeners();
     } finally {
@@ -227,10 +271,7 @@ class ChatController extends ChangeNotifier {
 
   void _upsertLocalMessage(ChatMessage message) {
     final active = _requireActiveConversation();
-    final nextMessages = <ChatMessage>[
-      ...active.messages,
-      message,
-    ];
+    final nextMessages = <ChatMessage>[...active.messages, message];
     _activeConversation = active.copyWith(messages: nextMessages);
   }
 
@@ -280,9 +321,7 @@ class ChatController extends ChangeNotifier {
     );
     if (reportGlobally) {
       _appErrorController?.publish(
-        errorNotice!.copyWith(
-          presentation: AppErrorPresentation.global,
-        ),
+        errorNotice!.copyWith(presentation: AppErrorPresentation.global),
       );
     }
     notifyListeners();
@@ -294,14 +333,15 @@ class ChatController extends ChangeNotifier {
     if (store == null || active == null) {
       return;
     }
-    final nextSummary = _summarize(
-      active.summary,
-      active.messages,
-    );
+    final nextSummary = _summarize(active.summary, active.messages);
     final nextRecord = active.copyWith(summary: nextSummary);
     _activeConversation = nextRecord;
-    _replaceSummary(nextSummary);
     await store.saveConversation(nextRecord);
+    if (_hasConversationContent(nextRecord.messages)) {
+      _replaceSummary(nextSummary);
+    } else {
+      _removeSummary(nextSummary.id);
+    }
   }
 
   void _replaceActiveConversation(ChatStoreSnapshot snapshot) {
@@ -309,16 +349,28 @@ class ChatController extends ChangeNotifier {
     _conversationSummaries
       ..clear()
       ..addAll(snapshot.conversationSummaries);
-    _replaceSummary(snapshot.activeConversation.summary);
+    if (_hasConversationContent(snapshot.activeConversation.messages)) {
+      _replaceSummary(snapshot.activeConversation.summary);
+    } else {
+      _removeSummary(snapshot.activeConversation.summary.id);
+    }
     notifyListeners();
   }
 
   void _replaceSummary(ChatConversationSummary summary) {
+    if (summary.messageCount <= 0) {
+      _removeSummary(summary.id);
+      return;
+    }
     _conversationSummaries.removeWhere((item) => item.id == summary.id);
     _conversationSummaries.insert(0, summary);
     _conversationSummaries.sort(
       (left, right) => right.updatedAtMs.compareTo(left.updatedAtMs),
     );
+  }
+
+  void _removeSummary(String conversationId) {
+    _conversationSummaries.removeWhere((item) => item.id == conversationId);
   }
 
   ChatConversationSummary _summarize(
@@ -332,10 +384,13 @@ class ChatController extends ChangeNotifier {
     final preview = messages.reversed
         .map((message) => message.text.trim())
         .firstWhere((text) => text.isNotEmpty, orElse: () => '');
+    final title = base.isTitleManuallyEdited
+        ? base.title
+        : (firstUserText.isEmpty
+              ? 'New chat'
+              : _truncate(firstUserText, maxLength: 32));
     return base.copyWith(
-      title: firstUserText.isEmpty
-          ? 'New chat'
-          : _truncate(firstUserText, maxLength: 32),
+      title: title,
       previewText: preview.isEmpty ? '' : _truncate(preview, maxLength: 60),
       updatedAtMs: DateTime.now().millisecondsSinceEpoch,
       messageCount: messages.length,
@@ -372,6 +427,13 @@ class ChatController extends ChangeNotifier {
 
   static bool _shouldCreateFreshConversation(String normalizedText) {
     return normalizedText == '/new' || normalizedText == '/reset';
+  }
+
+  static bool _hasConversationContent(List<ChatMessage> messages) {
+    return messages.any(
+      (message) =>
+          message.text.trim().isNotEmpty || message.attachments.isNotEmpty,
+    );
   }
 
   static String _truncate(String value, {required int maxLength}) {

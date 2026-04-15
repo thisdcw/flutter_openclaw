@@ -13,10 +13,8 @@ import '../../domain/repositories/chat_conversation_store.dart';
 import '../util/openclaw_logger.dart';
 
 class FileChatConversationStore implements ChatConversationStore {
-  FileChatConversationStore(
-    this._rootDirectory, {
-    Uuid? uuid,
-  }) : _uuid = uuid ?? const Uuid();
+  FileChatConversationStore(this._rootDirectory, {Uuid? uuid})
+    : _uuid = uuid ?? const Uuid();
 
   final Directory _rootDirectory;
   final Uuid _uuid;
@@ -35,15 +33,8 @@ class FileChatConversationStore implements ChatConversationStore {
   Future<ChatStoreSnapshot> bootstrap() async {
     await _ensureDirectories();
     final index = await _loadIndex();
-    if (index == null || index.summaries.isEmpty) {
+    if (index == null) {
       final initial = _buildConversationRecord();
-      final nextIndex = _ChatStoreIndex(
-        schemaVersion: _schemaVersion,
-        activeConversationId: initial.summary.id,
-        summaries: <ChatConversationSummary>[initial.summary],
-      );
-      await _persistConversation(initial);
-      await _saveIndex(nextIndex);
       openClawLog(
         'ChatConversationStore',
         'bootstrap created initial conversation',
@@ -54,29 +45,35 @@ class FileChatConversationStore implements ChatConversationStore {
       );
       return ChatStoreSnapshot(
         activeConversation: initial,
-        conversationSummaries: nextIndex.summaries,
+        conversationSummaries: const <ChatConversationSummary>[],
       );
     }
 
-    final activeId = index.activeConversationId.isNotEmpty
-        ? index.activeConversationId
-        : index.summaries.first.id;
-    final activeSummary = index.summaries.firstWhere(
-      (summary) => summary.id == activeId,
-      orElse: () => index.summaries.first,
-    );
-    final activeConversation = await _loadConversationSafely(activeSummary.id);
-    final nextSummaries = _upsertSummary(
-      index.summaries,
-      activeConversation.summary,
-    );
+    final baseSummaries = _sanitizeSummaries(index.summaries);
+    ChatConversationRecord activeConversation =
+        index.activeConversationId.isNotEmpty
+        ? (await _loadConversationIfExists(index.activeConversationId) ??
+              await _loadFirstAvailableConversation(baseSummaries) ??
+              _buildConversationRecord())
+        : (await _loadFirstAvailableConversation(baseSummaries) ??
+              _buildConversationRecord());
+    var nextSummaries = baseSummaries;
+    if (_hasConversationContent(activeConversation.messages)) {
+      final summarized = _summarizeConversation(
+        activeConversation.summary,
+        activeConversation.messages,
+      );
+      activeConversation = activeConversation.copyWith(summary: summarized);
+      await _persistConversation(activeConversation);
+      nextSummaries = _upsertSummary(nextSummaries, summarized);
+    }
     final nextIndex = index.copyWith(
-      activeConversationId: activeConversation.summary.id,
+      activeConversationId: _hasConversationContent(activeConversation.messages)
+          ? activeConversation.summary.id
+          : '',
       summaries: nextSummaries,
     );
-    if (nextIndex.activeConversationId != index.activeConversationId) {
-      await _saveIndex(nextIndex);
-    }
+    await _saveIndex(nextIndex);
     return ChatStoreSnapshot(
       activeConversation: activeConversation,
       conversationSummaries: nextSummaries,
@@ -87,17 +84,18 @@ class FileChatConversationStore implements ChatConversationStore {
   Future<ChatStoreSnapshot> createConversation() async {
     await _ensureDirectories();
     final index = await _loadIndex() ?? _emptyIndex();
+    final nextSummaries = _sanitizeSummaries(index.summaries);
     final conversation = _buildConversationRecord();
-    final nextSummaries = <ChatConversationSummary>[
-      conversation.summary,
-      ...index.summaries.where((summary) => summary.id != conversation.summary.id),
-    ];
     final nextIndex = _ChatStoreIndex(
       schemaVersion: _schemaVersion,
-      activeConversationId: conversation.summary.id,
+      activeConversationId:
+          nextSummaries.any(
+            (summary) => summary.id == index.activeConversationId,
+          )
+          ? index.activeConversationId
+          : '',
       summaries: nextSummaries,
     );
-    await _persistConversation(conversation);
     await _saveIndex(nextIndex);
     return ChatStoreSnapshot(
       activeConversation: conversation,
@@ -109,13 +107,24 @@ class FileChatConversationStore implements ChatConversationStore {
   Future<ChatStoreSnapshot> activateConversation(String conversationId) async {
     await _ensureDirectories();
     final index = await _loadIndex() ?? _emptyIndex();
-    final activeConversation = await _loadConversationSafely(conversationId);
-    final nextSummaries = _upsertSummary(
-      index.summaries,
-      activeConversation.summary,
-    );
+    final baseSummaries = _sanitizeSummaries(index.summaries);
+    ChatConversationRecord activeConversation =
+        await _loadConversationIfExists(conversationId) ??
+        _buildConversationRecord();
+    var nextSummaries = baseSummaries;
+    if (_hasConversationContent(activeConversation.messages)) {
+      final summarized = _summarizeConversation(
+        activeConversation.summary,
+        activeConversation.messages,
+      );
+      activeConversation = activeConversation.copyWith(summary: summarized);
+      await _persistConversation(activeConversation);
+      nextSummaries = _upsertSummary(nextSummaries, summarized);
+    }
     final nextIndex = index.copyWith(
-      activeConversationId: activeConversation.summary.id,
+      activeConversationId: _hasConversationContent(activeConversation.messages)
+          ? activeConversation.summary.id
+          : '',
       summaries: nextSummaries,
     );
     await _saveIndex(nextIndex);
@@ -126,9 +135,62 @@ class FileChatConversationStore implements ChatConversationStore {
   }
 
   @override
+  Future<ChatStoreSnapshot> renameConversationTitle({
+    required String conversationId,
+    required String title,
+  }) async {
+    final normalized = title.trim();
+    if (normalized.isEmpty) {
+      throw StateError('会话标题不能为空。');
+    }
+    await _ensureDirectories();
+    final index = await _loadIndex() ?? _emptyIndex();
+    final targetConversation = await _loadConversation(conversationId);
+    if (!_hasConversationContent(targetConversation.messages)) {
+      throw StateError('空会话不支持重命名。');
+    }
+    final updatedSummary = targetConversation.summary.copyWith(
+      title: _truncate(normalized, maxLength: 32),
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+      isTitleManuallyEdited: true,
+    );
+    final updatedConversation = targetConversation.copyWith(
+      summary: updatedSummary,
+    );
+    await _persistConversation(updatedConversation);
+    final nextSummaries = _upsertSummary(
+      _sanitizeSummaries(index.summaries),
+      updatedSummary,
+    );
+
+    final currentActiveId = index.activeConversationId.isEmpty
+        ? updatedSummary.id
+        : index.activeConversationId;
+    final nextActiveConversation = currentActiveId == updatedSummary.id
+        ? updatedConversation
+        : (await _loadConversationIfExists(currentActiveId) ??
+              await _loadFirstAvailableConversation(nextSummaries) ??
+              updatedConversation);
+    final nextIndex = _ChatStoreIndex(
+      schemaVersion: _schemaVersion,
+      activeConversationId:
+          _hasConversationContent(nextActiveConversation.messages)
+          ? nextActiveConversation.summary.id
+          : '',
+      summaries: nextSummaries,
+    );
+    await _saveIndex(nextIndex);
+    return ChatStoreSnapshot(
+      activeConversation: nextActiveConversation,
+      conversationSummaries: nextSummaries,
+    );
+  }
+
+  @override
   Future<void> saveConversation(ChatConversationRecord conversation) async {
     await _ensureDirectories();
     final index = await _loadIndex() ?? _emptyIndex();
+    final baseSummaries = _sanitizeSummaries(index.summaries);
     final updatedSummary = _summarizeConversation(
       conversation.summary.copyWith(
         updatedAtMs: DateTime.now().millisecondsSinceEpoch,
@@ -136,15 +198,36 @@ class FileChatConversationStore implements ChatConversationStore {
       conversation.messages,
     );
     final nextConversation = conversation.copyWith(summary: updatedSummary);
-    final nextSummaries = <ChatConversationSummary>[
-      updatedSummary,
-      ...index.summaries.where((summary) => summary.id != updatedSummary.id),
-    ]..sort(
-        (left, right) => right.updatedAtMs.compareTo(left.updatedAtMs),
+    if (!_hasConversationContent(nextConversation.messages)) {
+      await _removeConversationRecord(nextConversation.summary.id);
+      final nextSummaries = baseSummaries
+          .where((summary) => summary.id != nextConversation.summary.id)
+          .toList(growable: false);
+      final nextActiveId =
+          index.activeConversationId == nextConversation.summary.id
+          ? (nextSummaries.isEmpty ? '' : nextSummaries.first.id)
+          : (nextSummaries.any(
+                  (summary) => summary.id == index.activeConversationId,
+                )
+                ? index.activeConversationId
+                : '');
+      final nextIndex = _ChatStoreIndex(
+        schemaVersion: _schemaVersion,
+        activeConversationId: nextActiveId,
+        summaries: nextSummaries,
       );
+      await _saveIndex(nextIndex);
+      return;
+    }
+
+    final nextSummaries = _upsertSummary(baseSummaries, updatedSummary);
     final nextIndex = _ChatStoreIndex(
       schemaVersion: _schemaVersion,
-      activeConversationId: index.activeConversationId.isEmpty
+      activeConversationId:
+          index.activeConversationId.isEmpty ||
+              !nextSummaries.any(
+                (summary) => summary.id == index.activeConversationId,
+              )
           ? updatedSummary.id
           : index.activeConversationId,
       summaries: nextSummaries,
@@ -207,7 +290,9 @@ class FileChatConversationStore implements ChatConversationStore {
     );
   }
 
-  Future<ChatConversationRecord> _loadConversation(String conversationId) async {
+  Future<ChatConversationRecord> _loadConversation(
+    String conversationId,
+  ) async {
     final file = _conversationFile(conversationId);
     if (!await file.exists()) {
       throw StateError('Conversation "$conversationId" does not exist.');
@@ -228,33 +313,20 @@ class FileChatConversationStore implements ChatConversationStore {
           continue;
         }
         messages.add(
-          await _deserializeMessage(
-            Map<String, dynamic>.from(rawMessage),
-          ),
+          await _deserializeMessage(Map<String, dynamic>.from(rawMessage)),
         );
       }
     }
     return ChatConversationRecord(summary: summary, messages: messages);
   }
 
-  Future<ChatConversationRecord> _loadConversationSafely(
+  Future<ChatConversationRecord?> _loadConversationIfExists(
     String conversationId,
   ) async {
     try {
       return await _loadConversation(conversationId);
-    } catch (error, stackTrace) {
-      openClawLog(
-        'ChatConversationStore',
-        'load conversation failed, recreating conversation',
-        fields: <String, Object?>{
-          'conversationId': conversationId,
-          'error': error.toString(),
-          'stackTrace': stackTrace.toString(),
-        },
-      );
-      final fallback = _buildConversationRecord();
-      await _persistConversation(fallback);
-      return fallback;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -275,29 +347,39 @@ class FileChatConversationStore implements ChatConversationStore {
     await file.writeAsString(encoded, flush: true);
   }
 
+  Future<void> _removeConversationRecord(String conversationId) async {
+    final conversationFile = _conversationFile(conversationId);
+    if (await conversationFile.exists()) {
+      await conversationFile.delete();
+    }
+    final mediaDirectory = Directory(
+      p.join(_mediaDirectory.path, conversationId),
+    );
+    if (await mediaDirectory.exists()) {
+      await mediaDirectory.delete(recursive: true);
+    }
+  }
+
   Future<Map<String, dynamic>> _serializeMessage(
     String conversationId,
     ChatMessage message,
   ) async {
     final nextAttachments = <Map<String, dynamic>>[];
     for (final attachment in message.attachments) {
-      final extension =
-          _preferredExtension(attachment.mimeType, attachment.fileName);
-      final relativePath = p.join(
-        conversationId,
-        '${attachment.id}$extension',
+      final extension = _preferredExtension(
+        attachment.mimeType,
+        attachment.fileName,
       );
+      final relativePath = p.join(conversationId, '${attachment.id}$extension');
       final file = File(p.join(_mediaDirectory.path, relativePath));
       await file.parent.create(recursive: true);
       await file.writeAsBytes(attachment.bytes, flush: true);
-      nextAttachments.add(
-        <String, dynamic>{
-          'id': attachment.id,
-          'fileName': attachment.fileName,
-          'mimeType': attachment.mimeType,
-          'relativePath': relativePath,
-        },
-      );
+      nextAttachments.add(<String, dynamic>{
+        'id': attachment.id,
+        'fileName': attachment.fileName,
+        'mimeType': attachment.mimeType,
+        'relativePath': relativePath,
+      });
     }
 
     return <String, dynamic>{
@@ -350,7 +432,9 @@ class FileChatConversationStore implements ChatConversationStore {
     ChatConversationSummary base,
     List<ChatMessage> messages,
   ) {
-    final title = _deriveTitle(messages);
+    final title = base.isTitleManuallyEdited
+        ? base.title
+        : _deriveTitle(messages);
     final previewText = _derivePreview(messages);
     return base.copyWith(
       title: title,
@@ -398,17 +482,46 @@ class FileChatConversationStore implements ChatConversationStore {
     ChatConversationSummary summary,
   ) {
     final next = <ChatConversationSummary>[
-      summary,
+      if (_isPersistableSummary(summary)) summary,
       ...existing.where((item) => item.id != summary.id),
     ];
-    next.sort((left, right) => right.updatedAtMs.compareTo(left.updatedAtMs));
-    return next;
+    return _sanitizeSummaries(next);
+  }
+
+  List<ChatConversationSummary> _sanitizeSummaries(
+    List<ChatConversationSummary> summaries,
+  ) {
+    final next = summaries.where(_isPersistableSummary).toList(growable: false);
+    final sorted = List<ChatConversationSummary>.from(next);
+    sorted.sort((left, right) => right.updatedAtMs.compareTo(left.updatedAtMs));
+    return sorted;
+  }
+
+  bool _isPersistableSummary(ChatConversationSummary summary) {
+    return summary.messageCount > 0;
+  }
+
+  bool _hasConversationContent(List<ChatMessage> messages) {
+    return messages.any(
+      (message) =>
+          message.text.trim().isNotEmpty || message.attachments.isNotEmpty,
+    );
+  }
+
+  Future<ChatConversationRecord?> _loadFirstAvailableConversation(
+    List<ChatConversationSummary> summaries,
+  ) async {
+    for (final summary in summaries) {
+      final record = await _loadConversationIfExists(summary.id);
+      if (record != null) {
+        return record;
+      }
+    }
+    return null;
   }
 
   File _conversationFile(String conversationId) {
-    return File(
-      p.join(_conversationDirectory.path, '$conversationId.json'),
-    );
+    return File(p.join(_conversationDirectory.path, '$conversationId.json'));
   }
 
   _ChatStoreIndex _emptyIndex() {

@@ -55,8 +55,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final config = widget.settingsController.config;
         final activeSessionId =
             widget.chatController.activeConversationSummary?.sessionId ??
-                config.sessionId;
+            config.sessionId;
         final deviceId = connectionController.status.deviceId ?? '';
+        final hasDeviceToken = widget.settingsController.deviceToken
+            .trim()
+            .isNotEmpty;
+        final hasBootstrapToken = widget.settingsController.bootstrapToken
+            .trim()
+            .isNotEmpty;
+        final shouldShowReimportLabel =
+            hasBootstrapToken || connectionController.status.isReady;
+        final manualImportLabel = shouldShowReimportLabel
+            ? '手动重新导入'
+            : l10n.pairingImportManual;
+        final scanImportLabel = shouldShowReimportLabel
+            ? '扫码重新导入'
+            : l10n.pairingImportScan;
 
         return Scaffold(
           body: DecoratedBox(
@@ -64,7 +78,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0xFFEAF3FF), Color(0xFFF6F9FD), Color(0xFFF3F7FC)],
+                colors: [
+                  Color(0xFFEAF3FF),
+                  Color(0xFFF6F9FD),
+                  Color(0xFFF3F7FC),
+                ],
               ),
             ),
             child: SafeArea(
@@ -116,10 +134,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            '身份与令牌',
-                            style: theme.textTheme.titleLarge,
-                          ),
+                          Text('身份与令牌', style: theme.textTheme.titleLarge),
                           const SizedBox(height: 6),
                           Text(
                             '仅展示脱敏后的设备身份与凭证摘要，不支持复制。',
@@ -149,6 +164,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               fallback: '未导入',
                             ),
                           ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton.tonalIcon(
+                                  onPressed: _handleReconnectRequested,
+                                  icon: const Icon(Icons.refresh_rounded),
+                                  label: const Text('重连网关'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: hasDeviceToken
+                                      ? _handleClearDeviceTokenRequested
+                                      : null,
+                                  icon: const Icon(
+                                    Icons.delete_outline_rounded,
+                                  ),
+                                  label: const Text('清除 Device Token'),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -176,10 +215,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               setState(() {
                                 localePreference = next;
                               });
-                              await widget.settingsController.saveLocalePreference(
-                                next,
-                              );
+                              await widget.settingsController
+                                  .saveLocalePreference(next);
                             },
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest
+                                  .withOpacity(0.45),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: theme.colorScheme.outlineVariant
+                                    .withOpacity(0.55),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'OpenClaw Canvas 入口',
+                                        style: theme.textTheme.labelLarge,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        config.canvasEntryEnabled
+                                            ? '当前为显示状态，聊天页左上角可进入 Canvas。'
+                                            : '当前为隐藏状态，聊天页不再显示 Canvas 入口。',
+                                        style: theme.textTheme.bodySmall,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                OutlinedButton(
+                                  onPressed: () async {
+                                    await _handleCanvasEntryToggleRequested(
+                                      config.canvasEntryEnabled,
+                                    );
+                                  },
+                                  child: Text(
+                                    config.canvasEntryEnabled ? '隐藏入口' : '显示入口',
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -206,14 +292,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       context: context,
                                       isScrollControlled: true,
                                       builder: (_) => BootstrapImportSheet(
+                                        title: shouldShowReimportLabel
+                                            ? '重新导入配对码'
+                                            : '导入配对码',
+                                        submitLabel: shouldShowReimportLabel
+                                            ? '重新导入'
+                                            : '导入',
                                         onSubmit: (value) async {
                                           Navigator.of(context).pop();
-                                          await _handleBootstrapImport(value);
+                                          await _handleBootstrapImport(
+                                            value,
+                                            requiresConfirm:
+                                                shouldShowReimportLabel,
+                                          );
                                         },
                                       ),
                                     );
                                   },
-                                  child: Text(l10n.pairingImportManual),
+                                  child: Text(manualImportLabel),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -224,13 +320,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       MaterialPageRoute(
                                         builder: (_) => BootstrapScanScreen(
                                           onScanned: (value) async {
-                                            await _handleBootstrapImport(value);
+                                            await _handleBootstrapImport(
+                                              value,
+                                              requiresConfirm:
+                                                  shouldShowReimportLabel,
+                                            );
                                           },
                                         ),
                                       ),
                                     );
                                   },
-                                  child: Text(l10n.pairingImportScan),
+                                  child: Text(scanImportLabel),
                                 ),
                               ),
                             ],
@@ -288,7 +388,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Text(
                           appVersionText,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.82),
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withOpacity(0.82),
                           ),
                         ),
                       ],
@@ -303,27 +404,122 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _handleBootstrapImport(String value) async {
+  Future<void> _handleReconnectRequested() async {
+    final confirmed = await _confirmAction(
+      title: '确认重连网关？',
+      message: '这会主动发起一次新的连接流程，用于刷新当前连接状态。',
+      confirmText: '确认重连',
+    );
+    if (!confirmed) {
+      return;
+    }
+    await widget.connectionController.testConnection();
+    if (!mounted) {
+      return;
+    }
+    final isReady = widget.connectionController.status.isReady;
+    _showFeedbackSnackBar(isReady ? '重连成功。' : '重连失败，请检查配对状态后重试。');
+  }
+
+  Future<void> _handleClearDeviceTokenRequested() async {
+    final confirmed = await _confirmAction(
+      title: '确认清除 Device Token？',
+      message: '清除后当前设备将失去授权，需要重新配对后才能继续通信。',
+      confirmText: '确认清除',
+    );
+    if (!confirmed) {
+      return;
+    }
     try {
-      await widget.settingsController.importBootstrapToken(value);
+      final retainedDeviceId = widget.connectionController.status.deviceId;
+      await widget.settingsController.clearDeviceToken();
+      widget.connectionController.reset(deviceId: retainedDeviceId);
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('配对码已导入。'),
-        ),
-      );
+      _showFeedbackSnackBar('Device Token 已清除，请重新配对。');
     } catch (error) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString().replaceFirst('Bad state: ', '')),
-        ),
-      );
+      _showFeedbackSnackBar(error.toString().replaceFirst('Bad state: ', ''));
     }
+  }
+
+  Future<void> _handleBootstrapImport(
+    String value, {
+    required bool requiresConfirm,
+  }) async {
+    if (requiresConfirm) {
+      final confirmed = await _confirmAction(
+        title: '确认重新导入配对码？',
+        message: '重新导入会自动清除当前 Device Token，之后需要重新配对。',
+        confirmText: '确认重新导入',
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+    try {
+      final retainedDeviceId = widget.connectionController.status.deviceId;
+      await widget.settingsController.importBootstrapToken(value);
+      widget.connectionController.reset(deviceId: retainedDeviceId);
+      if (!mounted) {
+        return;
+      }
+      _showFeedbackSnackBar(requiresConfirm ? '配对码已重新导入，请重新配对。' : '配对码已导入。');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showFeedbackSnackBar(error.toString().replaceFirst('Bad state: ', ''));
+    }
+  }
+
+  Future<void> _handleCanvasEntryToggleRequested(bool currentEnabled) async {
+    final nextEnabled = !currentEnabled;
+    await widget.settingsController.saveCanvasEntryEnabled(nextEnabled);
+    if (!mounted) {
+      return;
+    }
+    _showFeedbackSnackBar(nextEnabled ? 'Canvas 入口已显示。' : 'Canvas 入口已隐藏。');
+  }
+
+  Future<bool> _confirmAction({
+    required String title,
+    required String message,
+    required String confirmText,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
+              child: Text(confirmText),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  void _showFeedbackSnackBar(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _maskSensitiveValue(String rawValue, {required String fallback}) {
@@ -341,10 +537,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 class _ReadonlySettingRow extends StatelessWidget {
-  const _ReadonlySettingRow({
-    required this.label,
-    required this.value,
-  });
+  const _ReadonlySettingRow({required this.label, required this.value});
 
   final String label;
   final String value;

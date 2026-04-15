@@ -16,8 +16,7 @@ import '../use_cases/reset_device_identity_use_case.dart';
 class SettingsController extends ChangeNotifier {
   SettingsController({
     GatewayConfig? initialConfig,
-    AppLocalePreference initialLocalePreference =
-        AppLocalePreference.system,
+    AppLocalePreference initialLocalePreference = AppLocalePreference.system,
     ConfigRepository? configRepository,
     AuthRepository? authRepository,
     AppLocalePreferenceRepository? appLocalePreferenceRepository,
@@ -25,23 +24,22 @@ class SettingsController extends ChangeNotifier {
     ImportBootstrapTokenUseCase? importBootstrapTokenUseCase,
     ResetDeviceIdentityUseCase? resetDeviceIdentityUseCase,
     bool isStub = false,
-  })  : _config = initialConfig ?? defaultGatewayConfig,
-        _localePreference = initialLocalePreference,
-        _configRepository = configRepository,
-        _authRepository = authRepository,
-        _appLocalePreferenceRepository = appLocalePreferenceRepository,
-        _clearOperatorAuthUseCase = clearOperatorAuthUseCase,
-        _importBootstrapTokenUseCase = importBootstrapTokenUseCase,
-        _resetDeviceIdentityUseCase = resetDeviceIdentityUseCase,
-        _isStub = isStub;
+  }) : _config = initialConfig ?? defaultGatewayConfig,
+       _localePreference = initialLocalePreference,
+       _configRepository = configRepository,
+       _authRepository = authRepository,
+       _appLocalePreferenceRepository = appLocalePreferenceRepository,
+       _clearOperatorAuthUseCase = clearOperatorAuthUseCase,
+       _importBootstrapTokenUseCase = importBootstrapTokenUseCase,
+       _resetDeviceIdentityUseCase = resetDeviceIdentityUseCase,
+       _isStub = isStub;
 
   factory SettingsController.fake({
-    AppLocalePreference initialLocalePreference =
-        AppLocalePreference.system,
+    AppLocalePreference initialLocalePreference = AppLocalePreference.system,
   }) => SettingsController(
-        isStub: true,
-        initialLocalePreference: initialLocalePreference,
-      );
+    isStub: true,
+    initialLocalePreference: initialLocalePreference,
+  );
 
   GatewayConfig _config;
   AppLocalePreference _localePreference;
@@ -71,6 +69,7 @@ class SettingsController extends ChangeNotifier {
         'sessionId': next.sessionId,
         'timeoutMs': next.timeoutMs,
         'locale': next.locale,
+        'canvasEntryEnabled': next.canvasEntryEnabled,
       },
     );
     _config = next;
@@ -86,6 +85,7 @@ class SettingsController extends ChangeNotifier {
         'sessionId': next.sessionId,
         'timeoutMs': next.timeoutMs,
         'locale': next.locale,
+        'canvasEntryEnabled': next.canvasEntryEnabled,
       },
     );
     _config = next;
@@ -118,6 +118,10 @@ class SettingsController extends ChangeNotifier {
   }
 
   Future<void> importBootstrapToken(String input) async {
+    await _clearOperatorAuthUseCase?.call();
+    if (_clearOperatorAuthUseCase == null) {
+      await _authRepository?.clearOperatorAuth();
+    }
     await _importBootstrapTokenUseCase?.call(input);
     final persistedConfig = await _configRepository?.load();
     if (persistedConfig != null) {
@@ -141,8 +145,9 @@ class SettingsController extends ChangeNotifier {
     final operatorAuth = await authRepository.loadOperatorAuth();
     final bootstrapToken = await authRepository.loadBootstrapToken();
     _operatorAuth = operatorAuth;
-    _bootstrapToken =
-        bootstrapToken != null && !bootstrapToken.isExpired ? bootstrapToken : null;
+    _bootstrapToken = bootstrapToken != null && !bootstrapToken.isExpired
+        ? bootstrapToken
+        : null;
     if (notify) {
       notifyListeners();
     }
@@ -153,6 +158,16 @@ class SettingsController extends ChangeNotifier {
       return;
     }
     final next = _config.copyWith(sessionId: sessionId);
+    _config = next;
+    await _configRepository?.save(next);
+    notifyListeners();
+  }
+
+  Future<void> saveCanvasEntryEnabled(bool enabled) async {
+    if (_config.canvasEntryEnabled == enabled) {
+      return;
+    }
+    final next = _config.copyWith(canvasEntryEnabled: enabled);
     _config = next;
     await _configRepository?.save(next);
     notifyListeners();
